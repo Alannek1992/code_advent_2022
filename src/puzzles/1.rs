@@ -1,18 +1,14 @@
-use crate::{
-    util::{print_solution, read_input_file},
-    Puzzle,
-};
+use crate::{util::print_solution, PuzzleInfo, Solution};
 
 // for more details check the https://adventofcode.com/2022/day/1
 pub struct FirstPuzzle {
-    puzzle_name: String,
-    puzzle_input: String,
+    puzzle: PuzzleInfo,
 }
 
-impl Puzzle for FirstPuzzle {
-    fn display_solution(&self) {
+impl Solution for FirstPuzzle {
+    fn solution(&self) {
         print_solution(
-            &self.puzzle_name,
+            &self.puzzle.name,
             self.most_calories(),
             self.sum_top_three_calories(),
         );
@@ -22,8 +18,7 @@ impl Puzzle for FirstPuzzle {
 impl FirstPuzzle {
     pub fn new() -> Self {
         Self {
-            puzzle_name: String::from("First Puzzle - Calories"),
-            puzzle_input: read_input_file("./inputs/1.txt"),
+            puzzle: PuzzleInfo::new("First Puzzle - Calories", "./inputs/1.txt"),
         }
     }
     fn most_calories(&self) -> i32 {
@@ -43,7 +38,7 @@ impl FirstPuzzle {
     fn get_calories_per_elf(&self) -> Vec<i32> {
         let mut calories_per_elv = Vec::new();
         let mut acc_calories_per_elf = 0;
-        let mut lines = self.puzzle_input.lines();
+        let mut lines = self.puzzle.input.lines();
 
         loop {
             match lines.next() {
@@ -77,8 +72,7 @@ mod tests {
         assert_eq!(
             24000,
             FirstPuzzle {
-                puzzle_name: String::from("Test"),
-                puzzle_input: get_input()
+                puzzle: get_puzzle_info()
             }
             .most_calories()
         );
@@ -90,29 +84,31 @@ mod tests {
         assert_eq!(
             45000,
             FirstPuzzle {
-                puzzle_name: String::from("Test"),
-                puzzle_input: get_input()
+                puzzle: get_puzzle_info()
             }
             .sum_top_three_calories()
         );
     }
 
-    fn get_input() -> String {
-        String::from(
-            "1000
-            2000
-            3000
-            
-            4000
-            
-            5000
-            6000
-            
-            7000
-            8000
-            9000
-            
-            10000",
-        )
+    fn get_puzzle_info() -> PuzzleInfo {
+        PuzzleInfo {
+            name: String::from("Test"),
+            input: String::from(
+                "1000
+                2000
+                3000
+                
+                4000
+                
+                5000
+                6000
+                
+                7000
+                8000
+                9000
+                
+                10000",
+            ),
+        }
     }
 }
