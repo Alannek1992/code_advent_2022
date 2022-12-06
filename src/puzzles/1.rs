@@ -4,25 +4,25 @@ use crate::{
 };
 
 // for more details check the https://adventofcode.com/2022/day/1
-pub struct FirstPuzzle<'a> {
-    puzzle_name: &'a str,
+pub struct FirstPuzzle {
+    puzzle_name: String,
     puzzle_input: String,
 }
 
-impl<'a> Puzzle for FirstPuzzle<'a> {
+impl Puzzle for FirstPuzzle {
     fn display_solution(&self) {
         print_solution(
-            self.puzzle_name,
+            &self.puzzle_name,
             self.most_calories(),
             self.sum_top_three_calories(),
         );
     }
 }
 
-impl<'a> FirstPuzzle<'a> {
+impl FirstPuzzle {
     pub fn new() -> Self {
         Self {
-            puzzle_name: "First Puzzle - Calories",
+            puzzle_name: String::from("First Puzzle - Calories"),
             puzzle_input: read_input_file("./inputs/1.txt"),
         }
     }
@@ -77,7 +77,7 @@ mod tests {
         assert_eq!(
             24000,
             FirstPuzzle {
-                puzzle_name: "Test",
+                puzzle_name: String::from("Test"),
                 puzzle_input: get_input()
             }
             .most_calories()
@@ -90,7 +90,7 @@ mod tests {
         assert_eq!(
             45000,
             FirstPuzzle {
-                puzzle_name: "Test",
+                puzzle_name: String::from("Test"),
                 puzzle_input: get_input()
             }
             .sum_top_three_calories()

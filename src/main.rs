@@ -1,7 +1,6 @@
-use first_puzzle::FirstPuzzle;
+use puzzles::first_puzzle::FirstPuzzle;
 
-mod first_puzzle;
-mod second_puzzle;
+mod puzzles;
 mod util;
 
 pub trait Puzzle {
