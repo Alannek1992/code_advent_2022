@@ -1,5 +1,6 @@
+use std::fs;
+
 use puzzles::first_puzzle::FirstPuzzle;
-use util::read_input_file;
 
 mod puzzles;
 mod util;
@@ -13,7 +14,7 @@ impl PuzzleInfo {
     pub fn new(name: &str, file_path: &str) -> Self {
         Self {
             name: String::from(name),
-            input: read_input_file(file_path),
+            input: fs::read_to_string(file_path).expect("Not able to read the file"),
         }
     }
 }
@@ -22,7 +23,9 @@ pub trait Solution {
 }
 
 fn main() {
-    let puzzles: Vec<Box<dyn Solution>> = vec![Box::new(FirstPuzzle::new())];
+    solutions(vec![FirstPuzzle::new()]);
+}
 
-    puzzles.iter().for_each(|p| p.solution());
+fn solutions(vec: Vec<impl Solution>) {
+    vec.iter().for_each(|puzzle| puzzle.solution());
 }
