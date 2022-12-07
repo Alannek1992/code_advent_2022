@@ -16,8 +16,8 @@ impl Solution for SecondPuzzle {
 }
 
 struct Game {
+    opponent_play: GameMoveVariant,
     my_play: GameMoveVariant,
-    result: GameResult,
 }
 #[derive(PartialEq, Clone)]
 enum GameMoveVariant {
@@ -34,36 +34,59 @@ enum GameResult {
 
 impl Game {
     fn new(opponent_play: GameMoveVariant, my_play: GameMoveVariant) -> Self {
-        let result = {
-            if opponent_play == my_play {
-                GameResult::DRAW
-            } else {
-                match opponent_play {
-                    GameMoveVariant::ROCK => {
-                        if my_play == GameMoveVariant::PAPER {
-                            GameResult::WIN
-                        } else {
-                            GameResult::LOSE
-                        }
+        Self {
+            opponent_play,
+            my_play,
+        }
+    }
+
+    fn get_desired_move_variant(
+        first_player_move: &GameMoveVariant,
+        desired_outcome: GameResult,
+    ) -> GameMoveVariant {
+        match desired_outcome {
+            GameResult::WIN => match first_player_move {
+                GameMoveVariant::ROCK => GameMoveVariant::PAPER,
+                GameMoveVariant::PAPER => GameMoveVariant::SCISSORS,
+                GameMoveVariant::SCISSORS => GameMoveVariant::ROCK,
+            },
+            GameResult::LOSE => match first_player_move {
+                GameMoveVariant::ROCK => GameMoveVariant::SCISSORS,
+                GameMoveVariant::PAPER => GameMoveVariant::ROCK,
+                GameMoveVariant::SCISSORS => GameMoveVariant::PAPER,
+            },
+            GameResult::DRAW => first_player_move.clone(),
+        }
+    }
+
+    fn evaluate_result(&self) -> GameResult {
+        if self.opponent_play == self.my_play {
+            GameResult::DRAW
+        } else {
+            match self.opponent_play {
+                GameMoveVariant::ROCK => {
+                    if self.my_play == GameMoveVariant::PAPER {
+                        GameResult::WIN
+                    } else {
+                        GameResult::LOSE
                     }
-                    GameMoveVariant::PAPER => {
-                        if my_play == GameMoveVariant::SCISSORS {
-                            GameResult::WIN
-                        } else {
-                            GameResult::LOSE
-                        }
+                }
+                GameMoveVariant::PAPER => {
+                    if self.my_play == GameMoveVariant::SCISSORS {
+                        GameResult::WIN
+                    } else {
+                        GameResult::LOSE
                     }
-                    GameMoveVariant::SCISSORS => {
-                        if my_play == GameMoveVariant::ROCK {
-                            GameResult::WIN
-                        } else {
-                            GameResult::LOSE
-                        }
+                }
+                GameMoveVariant::SCISSORS => {
+                    if self.my_play == GameMoveVariant::ROCK {
+                        GameResult::WIN
+                    } else {
+                        GameResult::LOSE
                     }
                 }
             }
-        };
-        Self { my_play, result }
+        }
     }
 }
 
@@ -116,17 +139,9 @@ impl SecondPuzzle {
                 _ => panic!("Cannot decrypt the game variant"),
             };
             let my_play = match my_play_enc {
-                'X' => match opponent_play {
-                    GameMoveVariant::ROCK => GameMoveVariant::SCISSORS,
-                    GameMoveVariant::PAPER => GameMoveVariant::ROCK,
-                    GameMoveVariant::SCISSORS => GameMoveVariant::PAPER,
-                },
-                'Z' => match opponent_play {
-                    GameMoveVariant::ROCK => GameMoveVariant::PAPER,
-                    GameMoveVariant::PAPER => GameMoveVariant::SCISSORS,
-                    GameMoveVariant::SCISSORS => GameMoveVariant::ROCK,
-                },
-                'Y' => opponent_play.clone(),
+                'X' => Game::get_desired_move_variant(&opponent_play, GameResult::LOSE),
+                'Z' => Game::get_desired_move_variant(&opponent_play, GameResult::WIN),
+                'Y' => Game::get_desired_move_variant(&opponent_play, GameResult::DRAW),
 
                 _ => panic!("Cannot decrypt the game variant"),
             };
@@ -141,7 +156,7 @@ impl SecondPuzzle {
             GameMoveVariant::PAPER => 2,
             GameMoveVariant::SCISSORS => 3,
         };
-        let points_per_result = match game.result {
+        let points_per_result = match game.evaluate_result() {
             GameResult::LOSE => 0,
             GameResult::DRAW => 3,
             GameResult::WIN => 6,
