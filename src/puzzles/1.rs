@@ -18,7 +18,7 @@ impl Solution for FirstPuzzle {
 impl FirstPuzzle {
     pub fn new() -> Self {
         Self {
-            puzzle: PuzzleInfo::new("First Puzzle - Calories", "./inputs/1.txt"),
+            puzzle: PuzzleInfo::new("First Puzzle - Calorie Counting", "./inputs/1.txt"),
         }
     }
     fn most_calories(&self) -> i32 {

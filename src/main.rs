@@ -1,6 +1,6 @@
 use std::fs;
 
-use puzzles::first_puzzle::FirstPuzzle;
+use puzzles::{first_puzzle::FirstPuzzle, second_puzzle::SecondPuzzle};
 
 mod puzzles;
 mod util;
@@ -23,9 +23,7 @@ pub trait Solution {
 }
 
 fn main() {
-    solutions(vec![FirstPuzzle::new()]);
-}
-
-fn solutions(vec: Vec<impl Solution>) {
-    vec.iter().for_each(|puzzle| puzzle.solution());
+    let puzzles:Vec<Box<dyn Solution>> = vec![Box::new(FirstPuzzle::new()), Box::new(SecondPuzzle::new())];
+    
+    puzzles.iter().for_each(|puzzle| puzzle.solution());
 }
