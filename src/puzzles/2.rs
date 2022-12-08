@@ -177,9 +177,9 @@ impl SecondPuzzle {
                     .filter(|c| !c.is_whitespace())
                     .collect::<String>();
                 let mut moves = line_without_spaces.chars();
-                let opponent_play = moves.next().expect("Opponent play does not exist");
-                let my_play = moves.next().expect("My play does not exist");
-                let (opponent_play, my_play) = decode(opponent_play, my_play);
+                let opponent_play_enc = moves.next().expect("Opponent play does not exist");
+                let my_play_enc = moves.next().expect("My play does not exist");
+                let (opponent_play, my_play) = decode(opponent_play_enc, my_play_enc);
                 Game::new(opponent_play, my_play)
             })
             .collect()
