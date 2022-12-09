@@ -1,6 +1,6 @@
 use std::fs;
 
-use puzzles::{first_puzzle::FirstPuzzle, second_puzzle::SecondPuzzle, third_puzzle::ThirdPuzzle};
+use puzzles::{first_puzzle::FirstPuzzle, second_puzzle::SecondPuzzle, third_puzzle::ThirdPuzzle, fourth_puzzle::FourthPuzzle};
 
 mod puzzles;
 mod util;
@@ -27,6 +27,7 @@ fn main() {
         Box::new(FirstPuzzle::new()),
         Box::new(SecondPuzzle::new()),
         Box::new(ThirdPuzzle::new()),
+        Box::new(FourthPuzzle::new()),
     ];
 
     puzzles.iter().for_each(|puzzle| puzzle.solution());
