@@ -6,3 +6,5 @@ pub mod second_puzzle;
 pub mod third_puzzle;
 #[path = "puzzles/4.rs"]
 pub mod fourth_puzzle;
+#[path ="puzzles/5.rs"]
+pub mod fifth_puzzle;
