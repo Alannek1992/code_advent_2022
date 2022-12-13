@@ -37,7 +37,6 @@ impl Stack {
     }
 }
 
-#[derive(Debug)]
 struct Instruction {
     amount: i32,
     from_stack: usize,
