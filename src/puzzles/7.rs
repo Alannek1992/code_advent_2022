@@ -1,5 +1,7 @@
 use core::panic;
 
+use regex::Regex;
+
 use crate::PuzzleInfo;
 
 pub struct SeventhPuzzle {
@@ -23,10 +25,22 @@ impl<'t> FileSystem<'t> {
 }
 
 #[derive(Debug)]
-enum LineCommand<'t> {
-    CDRoot,
-    CD,
-    LS(Vec<FileSystemNode<'t>>),
+enum LineCommand {
+    CD(CDKind),
+    LS(Vec<LSOutput>),
+}
+
+#[derive(Debug)]
+enum CDKind {
+    Root,
+    Up,
+    Down(char),
+}
+
+#[derive(Debug)]
+enum LSOutput {
+    File(i32, String),
+    Directory(char),
 }
 
 #[derive(Debug)]
@@ -67,21 +81,49 @@ impl SeventhPuzzle {
         }
     }
 
-    pub fn get_line_commands(&self) -> Vec<LineCommand> {
+    fn get_line_commands(&self) -> Vec<LineCommand> {
+        let re_command = Regex::new(r"\$.*").unwrap();
+        let re_cd_root = Regex::new(r".*cd /").unwrap();
+        let re_cd_down = Regex::new(r".*cd [a-z]").unwrap();
+        let re_cd_up = Regex::new(r".*cd ..").unwrap();
+        let re_file = Regex::new(r"(\d+) (.*)").unwrap();
+        let re_dir = Regex::new(r".*([a-z])").unwrap();
+
         let mut line_commads = Vec::new();
         let mut file_system_nodes = Vec::new();
 
         for line in self.puzzle.input.lines() {
             let line = line.trim();
-            if line.starts_with(['$']) {
+
+            if re_command.is_match(line) {
                 if !file_system_nodes.is_empty() {
                     line_commads.push(LineCommand::LS(file_system_nodes.drain(..).collect()))
-                } else if line.contains("..") {
-                    line_commads.push(LineCommand::CD)
-                } else {
-                    line_commads.push(LineCommand::CDRoot)
                 }
+
+                if re_cd_root.is_match(line) {
+                    line_commads.push(LineCommand::CD(CDKind::Root));
+                } else if re_cd_down.is_match(line) {
+                    line_commads.push(LineCommand::CD(CDKind::Down('a')));
+                } else if re_cd_up.is_match(line) {
+                    line_commads.push(LineCommand::CD(CDKind::Up));
+                }
+
+                continue;
             }
+
+            if let Some(file) = re_file.captures(line) {
+                file_system_nodes.push(LSOutput::File(
+                    *&file[1].parse().unwrap(),
+                    String::from(&file[2]),
+                ))
+            } else {
+                let test = re_dir.captures(line).unwrap();
+                file_system_nodes.push(LSOutput::Directory(*&test[1].chars().next().unwrap()))
+            }
+        }
+
+        if !file_system_nodes.is_empty() {
+            line_commads.push(LineCommand::LS(file_system_nodes))
         }
 
         println!("{:?}", line_commads);
