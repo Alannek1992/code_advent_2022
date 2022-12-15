@@ -1,26 +1,90 @@
-use core::panic;
+use std::collections::HashMap;
 
 use regex::Regex;
 
-use crate::PuzzleInfo;
+use crate::{util::print_solution, PuzzleInfo, Solution};
 
 pub struct SeventhPuzzle {
     puzzle: PuzzleInfo,
 }
 
-struct FileSystem<'t> {
-    root_node: FileSystemNode<'t>,
+impl Solution for SeventhPuzzle {
+    fn solution(&self) {
+        print_solution(
+            &self.puzzle.name,
+            self.total_size_of_dirs_to_delete(10000),
+            self.total_size_of_dirs_to_delete(10000),
+        );
+    }
 }
 
-impl<'t> FileSystem<'t> {
+#[derive(Debug)]
+struct FileSystem {
+    directories: HashMap<char, Directory>,
+}
+
+impl FileSystem {
     fn new() -> Self {
-        Self {
-            root_node: FileSystemNode::Directory(None, Vec::new()),
-        }
+        let mut directories = HashMap::new();
+        directories.insert('/', Directory::new(None, '/'));
+        Self { directories }
     }
 
     fn build_file_system_from_line_commands(line_commands: Vec<LineCommand>) -> Self {
-        Self::new()
+        let mut file_system = Self::new();
+        let mut current_dir = '/';
+
+        for line_command in line_commands {
+            match line_command {
+                LineCommand::CD(kind) => match kind {
+                    CDKind::Root => {
+                        current_dir = '/';
+                    }
+                    CDKind::Up => {
+                        current_dir = file_system
+                            .directories
+                            .get(&current_dir)
+                            .unwrap()
+                            .parent_dir_name
+                            .unwrap()
+                    }
+                    CDKind::Down(dir_name) => current_dir = dir_name,
+                },
+                LineCommand::LS(output) => {
+                    for ls_out in output {
+                        match ls_out {
+                            LSOutput::File(size, name) => {
+                                file_system
+                                    .directories
+                                    .get_mut(&current_dir)
+                                    .unwrap()
+                                    .add_file(File::new(name, size));
+                            }
+                            LSOutput::Directory(dir_name) => {
+                                let new_dir = Directory::new(Some(current_dir), dir_name);
+                                let current_dir_ref =
+                                    file_system.directories.get_mut(&current_dir).unwrap();
+                                current_dir_ref.add_sub_dir(new_dir.name);
+                                file_system.directories.insert(dir_name, new_dir);
+                            }
+                        };
+                    }
+                }
+            }
+        }
+
+        file_system
+    }
+
+    fn calculate_dir_size(&self, dir_name: char) -> i32 {
+        let dir = self.directories.get(&dir_name).expect("Dir does not exist");
+        let mut curr_size = dir.size();
+
+        dir.sub_dir_names.iter().for_each(|subdir| {
+            curr_size += self.calculate_dir_size(*subdir);
+        });
+
+        curr_size
     }
 }
 
@@ -44,33 +108,50 @@ enum LSOutput {
 }
 
 #[derive(Debug)]
-enum FileSystemNode<'t> {
-    Directory(Option<&'t Self>, Vec<Self>),
-    File(&'t Self, i32),
+struct Directory {
+    parent_dir_name: Option<char>,
+    name: char,
+    files: Vec<File>,
+    sub_dir_names: Vec<char>,
 }
 
-impl<'t> FileSystemNode<'t> {
-    pub fn append_node(&mut self, node: FileSystemNode<'t>) {
-        match self {
-            FileSystemNode::Directory(_, child_nodes) => child_nodes.push(node),
-            FileSystemNode::File(_, _) => panic!("Cannot append node to a file!"),
+impl Directory {
+    fn new(parent_dir_name: Option<char>, name: char) -> Self {
+        Self {
+            name,
+            parent_dir_name,
+            files: Vec::new(),
+            sub_dir_names: Vec::new(),
         }
     }
 
-    pub fn parent(&self) -> &Self {
-        match self {
-            FileSystemNode::Directory(parent, _) => {
-                parent.expect("Should not be accessing out of root")
-            }
-            FileSystemNode::File(parent, _) => parent,
-        }
+    fn add_file(&mut self, file: File) {
+        self.files.push(file);
     }
 
-    pub fn childs(&self) -> &Vec<Self> {
-        match self {
-            FileSystemNode::Directory(_, childs) => childs,
-            FileSystemNode::File(parent, _) => panic!("File cannot have childs"),
-        }
+    fn add_sub_dir(&mut self, sub_dir_name: char) {
+        self.sub_dir_names.push(sub_dir_name);
+    }
+
+    fn size(&self) -> i32 {
+        let mut size = 0;
+        self.files.iter().for_each(|f| {
+            size += f.size;
+        });
+
+        size
+    }
+}
+
+#[derive(Debug)]
+struct File {
+    name: String,
+    size: i32,
+}
+
+impl File {
+    fn new(name: String, size: i32) -> Self {
+        Self { name, size }
     }
 }
 
@@ -79,6 +160,18 @@ impl SeventhPuzzle {
         Self {
             puzzle: PuzzleInfo::new("Seventh Puzzle - No Space Left On Device", "./inputs/7.txt"),
         }
+    }
+
+    fn total_size_of_dirs_to_delete(&self, directory_size_limit: i32) -> i32 {
+        let line_commands = self.get_line_commands();
+        let file_system = FileSystem::build_file_system_from_line_commands(line_commands);
+
+        file_system
+            .directories
+            .iter()
+            .map(|(dir_name, _)| file_system.calculate_dir_size(*dir_name))
+            .filter(|dir_size| *dir_size < directory_size_limit)
+            .sum()
     }
 
     fn get_line_commands(&self) -> Vec<LineCommand> {
@@ -103,7 +196,10 @@ impl SeventhPuzzle {
                 if re_cd_root.is_match(line) {
                     line_commads.push(LineCommand::CD(CDKind::Root));
                 } else if re_cd_down.is_match(line) {
-                    line_commads.push(LineCommand::CD(CDKind::Down('a')));
+                    let dir_name = re_dir.captures(line).unwrap();
+                    line_commads.push(LineCommand::CD(CDKind::Down(
+                        *&dir_name[1].chars().next().unwrap(),
+                    )));
                 } else if re_cd_up.is_match(line) {
                     line_commads.push(LineCommand::CD(CDKind::Up));
                 }
@@ -117,16 +213,14 @@ impl SeventhPuzzle {
                     String::from(&file[2]),
                 ))
             } else {
-                let test = re_dir.captures(line).unwrap();
-                file_system_nodes.push(LSOutput::Directory(*&test[1].chars().next().unwrap()))
+                let dir_name = re_dir.captures(line).unwrap();
+                file_system_nodes.push(LSOutput::Directory(*&dir_name[1].chars().next().unwrap()))
             }
         }
 
         if !file_system_nodes.is_empty() {
             line_commads.push(LineCommand::LS(file_system_nodes))
         }
-
-        println!("{:?}", line_commads);
 
         line_commads
     }
@@ -139,12 +233,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn part_one() {
-        SeventhPuzzle {
-            puzzle: get_puzzle_info(),
-        }
-        .get_line_commands();
-        assert!(false);
+    fn total_size_of_dirs_at_most() {
+        assert_eq!(
+            95437,
+            SeventhPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .total_size_of_dirs_to_delete(100000)
+        )
     }
 
     fn get_puzzle_info() -> PuzzleInfo {
