@@ -1,5 +1,9 @@
-use std::collections::HashMap;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
 
+use itertools::Itertools;
 use regex::Regex;
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
@@ -12,7 +16,7 @@ impl Solution for SeventhPuzzle {
     fn solution(&self) {
         print_solution(
             &self.puzzle.name,
-            self.total_size_of_dirs_to_delete(10000),
+            self.total_size_of_dirs_to_delete(100000),
             self.total_size_of_dirs_to_delete(10000),
         );
     }
@@ -20,52 +24,53 @@ impl Solution for SeventhPuzzle {
 
 #[derive(Debug)]
 struct FileSystem {
-    directories: HashMap<char, Directory>,
+    directories: HashMap<u64, Directory>,
 }
 
 impl FileSystem {
-    fn new() -> Self {
-        let mut directories = HashMap::new();
-        directories.insert('/', Directory::new(None, '/'));
-        Self { directories }
-    }
-
     fn build_file_system_from_line_commands(line_commands: Vec<LineCommand>) -> Self {
-        let mut file_system = Self::new();
-        let mut current_dir = '/';
+        let mut directories = HashMap::new();
+        let root_dir_hash = Self::get_hash("/");
+        directories.insert(root_dir_hash, Directory::new(None, "/"));
+        let mut current_path = String::from("/");
 
         for line_command in line_commands {
             match line_command {
                 LineCommand::CD(kind) => match kind {
-                    CDKind::Root => {
-                        current_dir = '/';
-                    }
                     CDKind::Up => {
-                        current_dir = file_system
-                            .directories
-                            .get(&current_dir)
-                            .unwrap()
-                            .parent_dir_name
-                            .unwrap()
+                        let current_dir = directories.get(&Self::get_hash(&current_path)).unwrap();
+                        current_path = String::from(
+                            &current_path[..(current_path.len() - current_dir.name.len() - 1)],
+                        );
                     }
-                    CDKind::Down(dir_name) => current_dir = dir_name,
+                    CDKind::Down(dir_name) => {
+                        current_path.push_str(&format!("{}/", dir_name));
+                    }
                 },
                 LineCommand::LS(output) => {
                     for ls_out in output {
                         match ls_out {
                             LSOutput::File(size, name) => {
-                                file_system
-                                    .directories
-                                    .get_mut(&current_dir)
+                                directories
+                                    .get_mut(&FileSystem::get_hash(&current_path))
                                     .unwrap()
                                     .add_file(File::new(name, size));
                             }
                             LSOutput::Directory(dir_name) => {
-                                let new_dir = Directory::new(Some(current_dir), dir_name);
-                                let current_dir_ref =
-                                    file_system.directories.get_mut(&current_dir).unwrap();
-                                current_dir_ref.add_sub_dir(new_dir.name);
-                                file_system.directories.insert(dir_name, new_dir);
+                                let new_dir_path =
+                                    Self::get_hash(&format!("{}{}/", current_path, dir_name));
+
+                                if !directories.contains_key(&new_dir_path) {
+                                    let current_dir_hash = Self::get_hash(&current_path);
+                                    let current_dir_ref =
+                                        directories.get_mut(&current_dir_hash).unwrap();
+
+                                    current_dir_ref.add_sub_dir(new_dir_path);
+                                    directories.insert(
+                                        new_dir_path,
+                                        Directory::new(Some(current_dir_hash), &dir_name),
+                                    );
+                                }
                             }
                         };
                     }
@@ -73,18 +78,24 @@ impl FileSystem {
             }
         }
 
-        file_system
+        FileSystem { directories }
     }
 
-    fn calculate_dir_size(&self, dir_name: char) -> i32 {
-        let dir = self.directories.get(&dir_name).expect("Dir does not exist");
+    fn calculate_dir_size(&self, dir_hash: u64) -> i32 {
+        let dir = self.directories.get(&dir_hash).expect("Dir does not exist");
         let mut curr_size = dir.size();
 
-        dir.sub_dir_names.iter().for_each(|subdir| {
+        dir.sub_dir_hash_paths.iter().for_each(|subdir| {
             curr_size += self.calculate_dir_size(*subdir);
         });
 
         curr_size
+    }
+
+    fn get_hash(dir_name: &str) -> u64 {
+        let mut h = DefaultHasher::new();
+        dir_name.hash(&mut h);
+        h.finish()
     }
 }
 
@@ -96,32 +107,31 @@ enum LineCommand {
 
 #[derive(Debug)]
 enum CDKind {
-    Root,
     Up,
-    Down(char),
+    Down(String),
 }
 
 #[derive(Debug)]
 enum LSOutput {
     File(i32, String),
-    Directory(char),
+    Directory(String),
 }
 
 #[derive(Debug)]
 struct Directory {
-    parent_dir_name: Option<char>,
-    name: char,
+    parent_dir_path_hash: Option<u64>,
+    name: String,
     files: Vec<File>,
-    sub_dir_names: Vec<char>,
+    sub_dir_hash_paths: Vec<u64>,
 }
 
 impl Directory {
-    fn new(parent_dir_name: Option<char>, name: char) -> Self {
+    fn new(parent_dir_path_hash: Option<u64>, name: &str) -> Self {
         Self {
-            name,
-            parent_dir_name,
+            name: String::from(name),
+            parent_dir_path_hash,
             files: Vec::new(),
-            sub_dir_names: Vec::new(),
+            sub_dir_hash_paths: Vec::new(),
         }
     }
 
@@ -129,8 +139,8 @@ impl Directory {
         self.files.push(file);
     }
 
-    fn add_sub_dir(&mut self, sub_dir_name: char) {
-        self.sub_dir_names.push(sub_dir_name);
+    fn add_sub_dir(&mut self, sub_dir_hash: u64) {
+        self.sub_dir_hash_paths.push(sub_dir_hash);
     }
 
     fn size(&self) -> i32 {
@@ -163,6 +173,30 @@ impl SeventhPuzzle {
     }
 
     fn total_size_of_dirs_to_delete(&self, directory_size_limit: i32) -> i32 {
+        self.get_dir_sizes()
+            .iter()
+            .filter(|dir_size| **dir_size < directory_size_limit)
+            .sum()
+    }
+
+    fn size_of_dir_to_delete(&self, directory_size_limit: i32, space_needed: i32) -> i32 {
+        self
+        .get_dir_sizes()
+        .iter().sorted().for_each(|value| println!("Value is: {}", value));
+
+
+
+        *self
+            .get_dir_sizes()
+            .iter()
+            .sorted()
+            .find(|size| {
+                **size + self.total_size_of_dirs_to_delete(directory_size_limit) >= space_needed
+            })
+            .unwrap()
+    }
+
+    fn get_dir_sizes(&self) -> Vec<i32> {
         let line_commands = self.get_line_commands();
         let file_system = FileSystem::build_file_system_from_line_commands(line_commands);
 
@@ -170,17 +204,15 @@ impl SeventhPuzzle {
             .directories
             .iter()
             .map(|(dir_name, _)| file_system.calculate_dir_size(*dir_name))
-            .filter(|dir_size| *dir_size < directory_size_limit)
-            .sum()
+            .collect()
     }
 
     fn get_line_commands(&self) -> Vec<LineCommand> {
         let re_command = Regex::new(r"\$.*").unwrap();
-        let re_cd_root = Regex::new(r".*cd /").unwrap();
         let re_cd_down = Regex::new(r".*cd [a-z]").unwrap();
         let re_cd_up = Regex::new(r".*cd ..").unwrap();
         let re_file = Regex::new(r"(\d+) (.*)").unwrap();
-        let re_dir = Regex::new(r".*([a-z])").unwrap();
+        let re_dir = Regex::new(r".* (\w+)").unwrap();
 
         let mut line_commads = Vec::new();
         let mut file_system_nodes = Vec::new();
@@ -192,14 +224,9 @@ impl SeventhPuzzle {
                 if !file_system_nodes.is_empty() {
                     line_commads.push(LineCommand::LS(file_system_nodes.drain(..).collect()))
                 }
-
-                if re_cd_root.is_match(line) {
-                    line_commads.push(LineCommand::CD(CDKind::Root));
-                } else if re_cd_down.is_match(line) {
+                if re_cd_down.is_match(line) {
                     let dir_name = re_dir.captures(line).unwrap();
-                    line_commads.push(LineCommand::CD(CDKind::Down(
-                        *&dir_name[1].chars().next().unwrap(),
-                    )));
+                    line_commads.push(LineCommand::CD(CDKind::Down(String::from(&dir_name[1]))));
                 } else if re_cd_up.is_match(line) {
                     line_commads.push(LineCommand::CD(CDKind::Up));
                 }
@@ -214,7 +241,7 @@ impl SeventhPuzzle {
                 ))
             } else {
                 let dir_name = re_dir.captures(line).unwrap();
-                file_system_nodes.push(LSOutput::Directory(*&dir_name[1].chars().next().unwrap()))
+                file_system_nodes.push(LSOutput::Directory(String::from(&dir_name[1])));
             }
         }
 
@@ -231,6 +258,17 @@ mod tests {
     use crate::PuzzleInfo;
 
     use super::*;
+
+    #[test]
+    fn size_of_dir_to_delete() {
+        assert_eq!(
+            24933642,
+            SeventhPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .size_of_dir_to_delete(100000, 30000000)
+        )
+    }
 
     #[test]
     fn total_size_of_dirs_at_most() {
