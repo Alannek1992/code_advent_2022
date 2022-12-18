@@ -22,7 +22,6 @@ impl Solution for SeventhPuzzle {
     }
 }
 
-#[derive(Debug)]
 struct FileSystem {
     directories: HashMap<u64, Directory>,
 }
@@ -65,7 +64,7 @@ impl FileSystem {
                                     let current_dir_ref =
                                         directories.get_mut(&current_dir_hash).unwrap();
 
-                                    current_dir_ref.add_sub_dir(&new_dir_path);
+                                    current_dir_ref.add_sub_dir(&dir_name);
                                     directories.insert(
                                         new_dir_path_hash,
                                         Directory::new(&new_dir_path, &dir_name),
@@ -85,8 +84,9 @@ impl FileSystem {
         let dir = self.directories.get(&dir_hash).expect("Dir does not exist");
         let mut curr_size = dir.size();
 
-        dir.sub_dir_paths.iter().for_each(|subdir| {
-            curr_size += self.calculate_dir_size(Self::get_hash(&subdir));
+        dir.sub_dir_names.iter().for_each(|subdir| {
+            curr_size +=
+                self.calculate_dir_size(Self::get_hash(&format!("{}{}/", dir.path, subdir)));
         });
 
         curr_size
@@ -99,12 +99,11 @@ impl FileSystem {
     }
 }
 
-#[derive(Debug)]
 struct Directory {
     path: String,
     name: String,
     files: Vec<File>,
-    sub_dir_paths: Vec<String>,
+    sub_dir_names: Vec<String>,
 }
 
 impl Directory {
@@ -113,7 +112,7 @@ impl Directory {
             path: String::from(path),
             name: String::from(name),
             files: Vec::new(),
-            sub_dir_paths: Vec::new(),
+            sub_dir_names: Vec::new(),
         }
     }
 
@@ -121,8 +120,8 @@ impl Directory {
         self.files.push(file);
     }
 
-    fn add_sub_dir(&mut self, sub_dir_path: &str) {
-        self.sub_dir_paths.push(String::from(sub_dir_path));
+    fn add_sub_dir(&mut self, sub_dir_name: &str) {
+        self.sub_dir_names.push(String::from(sub_dir_name));
     }
 
     fn size(&self) -> i32 {
@@ -135,7 +134,6 @@ impl Directory {
     }
 }
 
-#[derive(Debug)]
 struct File {
     size: i32,
 }
@@ -146,19 +144,16 @@ impl File {
     }
 }
 
-#[derive(Debug)]
 enum LineCommand {
     CD(CDKind),
     LS(Vec<LSOutput>),
 }
 
-#[derive(Debug)]
 enum CDKind {
     Up,
     Down(String),
 }
 
-#[derive(Debug)]
 enum LSOutput {
     File(i32),
     Directory(String),

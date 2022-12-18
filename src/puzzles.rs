@@ -12,4 +12,6 @@ pub mod fifth_puzzle;
 pub mod sixth_puzzle;
 #[path ="puzzles/7.rs"]
 pub mod seventh_puzzle;
+#[path ="puzzles/8.rs"]
+pub mod eighth_puzzle;
 
