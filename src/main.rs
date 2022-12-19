@@ -1,8 +1,9 @@
 use std::fs;
 
 use puzzles::{
-    fifth_puzzle::FifthPuzzle, first_puzzle::FirstPuzzle, fourth_puzzle::FourthPuzzle,
-    second_puzzle::SecondPuzzle, sixth_puzzle::SixthPuzzle, third_puzzle::ThirdPuzzle, seventh_puzzle::SeventhPuzzle,
+    eighth_puzzle::EighthPuzzle, fifth_puzzle::FifthPuzzle, first_puzzle::FirstPuzzle,
+    fourth_puzzle::FourthPuzzle, second_puzzle::SecondPuzzle, seventh_puzzle::SeventhPuzzle,
+    sixth_puzzle::SixthPuzzle, third_puzzle::ThirdPuzzle,
 };
 
 mod puzzles;
@@ -34,6 +35,7 @@ fn main() {
         Box::new(FifthPuzzle::new()),
         Box::new(SixthPuzzle::new()),
         Box::new(SeventhPuzzle::new()),
+        Box::new(EighthPuzzle::new()),
     ];
 
     puzzles.iter().for_each(|puzzle| puzzle.solution());
