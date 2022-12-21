@@ -92,6 +92,7 @@ impl GridOfPositions {
                         knot.1 = previous_knot.1;
 
                         // problem is related to direction recognition
+                        // should be enough to cover all arms
                         if let Movement::Up(_) = movement {
                             knot.0 += 1;
                         } else {
