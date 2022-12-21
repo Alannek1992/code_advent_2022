@@ -12,7 +12,7 @@ impl Solution for NinthPuzzle {
     fn solution(&self) {
         print_solution(
             &self.puzzle.name,
-            self.get_grid().positions_visited_by_tail(),
+            self.get_grid(1).positions_visited_by_tail(),
             0,
         );
     }
@@ -45,30 +45,22 @@ struct GridOfPositions {
 
 struct Tail {
     last_knot_pos: Position,
-    length: usize,
+    knots: Vec<Position>,
 }
 
 impl Tail {
     fn new(length: usize) -> Self {
         Self {
             last_knot_pos: (0, 0),
-            length,
+            knots: vec![(0, 0); length],
         }
-    }
-
-    fn get_knots(&self) -> Vec<Position> {
-        vec![(0, 0); self.length]
     }
 }
 
 impl GridOfPositions {
     fn build_grid(movements: Vec<Movement>, tail_length: usize) -> Self {
-        // initialize starting position
-        let head = (0, 0);
-        let tail = (0, 0);
-
         Self {
-            head,
+            head: (0, 0),
             tail: Tail::new(tail_length),
             movements,
         }
@@ -76,6 +68,8 @@ impl GridOfPositions {
 
     fn positions_visited_by_tail(&mut self) -> u32 {
         let mut visited_positions = HashSet::new();
+        // starting position
+        visited_positions.insert((0, 0));
         for movement in self.movements.iter() {
             for _ in 0..movement.get_value() {
                 match movement {
@@ -86,14 +80,18 @@ impl GridOfPositions {
                 }
 
                 let mut previous_knot = self.head;
-                let mut knots = self.tail.get_knots();
+                let knots = &mut self.tail.knots;
                 let knots_len = knots.len();
                 for (idx, knot) in knots.iter_mut().enumerate() {
                     let is_line_gap = (previous_knot.0 - knot.0).abs() > 1;
                     let is_col_gap = (previous_knot.1 - knot.1).abs() > 1;
 
-                    if is_line_gap {
+                    if !(is_line_gap || is_col_gap) {
+                        break;
+                    } else if is_line_gap {
                         knot.1 = previous_knot.1;
+
+                        // problem is related to direction recognition
                         if let Movement::Up(_) = movement {
                             knot.0 += 1;
                         } else {
@@ -128,7 +126,7 @@ impl NinthPuzzle {
         }
     }
 
-    fn get_grid(&self) -> GridOfPositions {
+    fn get_grid(&self, tail_length: usize) -> GridOfPositions {
         let mut movements = Vec::new();
         let re_movement = Regex::new(r"([A-Z]) (\d+)").unwrap();
 
@@ -146,7 +144,7 @@ impl NinthPuzzle {
             movements.push(movement);
         });
 
-        GridOfPositions::build_grid(movements, 1)
+        GridOfPositions::build_grid(movements, tail_length)
     }
 }
 
@@ -172,7 +170,7 @@ mod tests {
                 R 2"
                 ),
             }
-            .get_grid()
+            .get_grid(1)
             .positions_visited_by_tail()
         );
     }
@@ -193,7 +191,7 @@ mod tests {
                     U 20"
                 ),
             }
-            .get_grid()
+            .get_grid(9)
             .positions_visited_by_tail()
         );
     }
