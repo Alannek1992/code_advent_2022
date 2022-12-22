@@ -12,8 +12,8 @@ impl Solution for NinthPuzzle {
     fn solution(&self) {
         print_solution(
             &self.puzzle.name,
-            self.get_grid(1).positions_visited_by_tail(),
-            0,
+            self.get_grid(1).positions_visited_by_tail_last_knot(),
+            self.get_grid(9).positions_visited_by_tail_last_knot(),
         );
     }
 }
@@ -55,6 +55,17 @@ impl Tail {
             knots: vec![(0, 0); length],
         }
     }
+
+    fn increment_or_decrement_knot(
+        curr_knot_pos_coordinate: &mut i32,
+        previous_knot_pos_coordinate: i32,
+    ) {
+        if previous_knot_pos_coordinate > *curr_knot_pos_coordinate {
+            *curr_knot_pos_coordinate += 1;
+        } else {
+            *curr_knot_pos_coordinate -= 1;
+        }
+    }
 }
 
 impl GridOfPositions {
@@ -66,7 +77,7 @@ impl GridOfPositions {
         }
     }
 
-    fn positions_visited_by_tail(&mut self) -> u32 {
+    fn positions_visited_by_tail_last_knot(&mut self) -> u32 {
         let mut visited_positions = HashSet::new();
         // starting position
         visited_positions.insert((0, 0));
@@ -88,21 +99,15 @@ impl GridOfPositions {
 
                     if !(is_line_gap || is_col_gap) {
                         break;
+                    } else if is_line_gap && is_col_gap {
+                        Tail::increment_or_decrement_knot(&mut knot.0, previous_knot.0);
+                        Tail::increment_or_decrement_knot(&mut knot.1, previous_knot.1);
                     } else if is_line_gap {
                         knot.1 = previous_knot.1;
-
-                        // problem is related to direction recognition
-                        // should be enough to cover all arms
-                        match movement {
-                            Movement::Up(_) | Movement::Right(_) => knot.0 += 1,
-                            _ => knot.0 -= 1,
-                        }
+                        Tail::increment_or_decrement_knot(&mut knot.0, previous_knot.0);
                     } else if is_col_gap {
                         knot.0 = previous_knot.0;
-                        match movement {
-                            Movement::Up(_) | Movement::Right(_) => knot.1 += 1,
-                            _ => knot.1 -= 1,
-                        }
+                        Tail::increment_or_decrement_knot(&mut knot.1, previous_knot.1);
                     }
 
                     if idx == knots_len - 1 {
@@ -170,7 +175,7 @@ mod tests {
                 ),
             }
             .get_grid(1)
-            .positions_visited_by_tail()
+            .positions_visited_by_tail_last_knot()
         );
     }
 
@@ -191,7 +196,7 @@ mod tests {
                 ),
             }
             .get_grid(9)
-            .positions_visited_by_tail()
+            .positions_visited_by_tail_last_knot()
         );
     }
 
