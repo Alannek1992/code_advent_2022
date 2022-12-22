@@ -93,17 +93,15 @@ impl GridOfPositions {
 
                         // problem is related to direction recognition
                         // should be enough to cover all arms
-                        if let Movement::Up(_) = movement {
-                            knot.0 += 1;
-                        } else {
-                            knot.0 -= 1;
+                        match movement {
+                            Movement::Up(_) | Movement::Right(_) => knot.0 += 1,
+                            _ => knot.0 -= 1,
                         }
                     } else if is_col_gap {
                         knot.0 = previous_knot.0;
-                        if let Movement::Right(_) = movement {
-                            knot.1 += 1;
-                        } else {
-                            knot.1 -= 1;
+                        match movement {
+                            Movement::Up(_) | Movement::Right(_) => knot.1 += 1,
+                            _ => knot.1 -= 1,
                         }
                     }
 
