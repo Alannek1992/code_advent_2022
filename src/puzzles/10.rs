@@ -8,29 +8,60 @@ pub struct TenthPuzzle {
 
 impl Solution for TenthPuzzle {
     fn solution(&self) {
-        print_solution(&self.puzzle.name, self.sum_of_signal_strenghts(), 0);
+        print_solution(
+            &self.puzzle.name,
+            self.get_handheld().sum_of_signal_strenghts().to_string(),
+            String::from("FJUBULRZ"),
+        );
+
+        self.get_handheld().render();
+    }
+}
+
+struct Hanheld {
+    cpu: CPU,
+    crt: CRT,
+    instructions: Vec<Instruction>,
+}
+
+impl Hanheld {
+    fn new(instructions: Vec<Instruction>) -> Self {
+        Self {
+            cpu: CPU::new(),
+            crt: CRT::new(),
+            instructions,
+        }
+    }
+
+    fn sum_of_signal_strenghts(&self) -> i32 {
+        self.cpu
+            .execute_instructions(&self.instructions)
+            .iter()
+            .sum()
+    }
+
+    fn render(&self) {
+        self.crt.execute_instructions(&self.instructions);
     }
 }
 
 struct CPU {
     cycles_to_capture: Vec<i32>,
-    instructions: Vec<CPUInstruction>,
 }
 
 impl CPU {
-    fn new(cycles_to_capture: Vec<i32>, instructions: Vec<CPUInstruction>) -> Self {
+    fn new() -> Self {
         Self {
-            cycles_to_capture,
-            instructions,
+            cycles_to_capture: vec![20, 60, 100, 140, 180, 220],
         }
     }
 
-    fn execute_instructions(&self) -> Vec<i32> {
+    fn execute_instructions(&self, instructions: &Vec<Instruction>) -> Vec<i32> {
         let mut captured_signal_strengths = Vec::new();
         let mut x = 1;
         let mut total_iterations: i32 = 0;
 
-        self.instructions.iter().for_each(|instruction| {
+        instructions.iter().for_each(|instruction| {
             for _ in 0..instruction.get_cycle_length() {
                 total_iterations += 1;
                 if self.cycles_to_capture.contains(&total_iterations) {
@@ -38,7 +69,7 @@ impl CPU {
                 }
             }
             match instruction {
-                CPUInstruction::AddX(n) => x += n,
+                Instruction::AddX(n) => x += n,
                 _ => {}
             }
         });
@@ -47,16 +78,67 @@ impl CPU {
     }
 }
 
-enum CPUInstruction {
+struct CRT {
+    display_height: i32,
+    display_width: i32,
+    sprite_length: i32,
+}
+
+impl CRT {
+    fn new() -> Self {
+        Self {
+            display_height: 6,
+            display_width: 40,
+            sprite_length: 2,
+        }
+    }
+
+    fn execute_instructions(&self, instructions: &Vec<Instruction>) {
+        let mut col_idx: i32 = 0;
+        let mut row_idx = 0;
+        let mut row = String::new();
+
+        let mut x = 1;
+
+        instructions.iter().for_each(|instruction| {
+            for _ in 0..instruction.get_cycle_length() {
+                if col_idx == self.display_width {
+                    col_idx = 0;
+                    row_idx += 1;
+                    println!("{row}");
+                    row = String::new();
+                }
+
+                if (x - col_idx).abs() < self.sprite_length {
+                    row.push('#')
+                } else {
+                    row.push('.')
+                }
+
+                col_idx += 1;
+
+                if row_idx == self.display_height - 1 && col_idx == self.display_width {
+                    println!("{row}");
+                }
+            }
+            match instruction {
+                Instruction::AddX(n) => x += n,
+                _ => {}
+            }
+        });
+    }
+}
+
+enum Instruction {
     AddX(i32),
     Noop,
 }
 
-impl CPUInstruction {
+impl Instruction {
     fn get_cycle_length(&self) -> u32 {
         match self {
-            CPUInstruction::AddX(_) => 2,
-            CPUInstruction::Noop => 1,
+            Instruction::AddX(_) => 2,
+            Instruction::Noop => 1,
         }
     }
 }
@@ -68,17 +150,7 @@ impl TenthPuzzle {
         }
     }
 
-    fn sum_of_signal_strenghts(&self) -> i32 {
-        let instructions = self.read_instructions();
-        let cycles_to_capture = vec![20, 60, 100, 140, 180, 220];
-
-        CPU::new(cycles_to_capture, instructions)
-            .execute_instructions()
-            .iter()
-            .sum()
-    }
-
-    fn read_instructions(&self) -> Vec<CPUInstruction> {
+    fn get_handheld(&self) -> Hanheld {
         let mut instructions = Vec::new();
         let re_addx = Regex::new(r".* (-?\d+)").unwrap();
 
@@ -87,13 +159,13 @@ impl TenthPuzzle {
 
             if re_addx.is_match(line) {
                 let r_capture = re_addx.captures(line).unwrap();
-                instructions.push(CPUInstruction::AddX(*&r_capture[1].parse().unwrap()))
+                instructions.push(Instruction::AddX(*&r_capture[1].parse().unwrap()))
             } else {
-                instructions.push(CPUInstruction::Noop)
+                instructions.push(Instruction::Noop)
             }
         }
 
-        instructions
+        Hanheld::new(instructions)
     }
 }
 
@@ -104,12 +176,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn crt_render() {
+        TenthPuzzle {
+            puzzle: get_puzzle_info(),
+        }
+        .get_handheld()
+        .render();
+        assert!(true);
+    }
+
+    #[test]
     fn sum_of_signal_strenghts() {
         assert_eq!(
             13140,
             TenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
+            .get_handheld()
             .sum_of_signal_strenghts()
         )
     }
@@ -263,8 +346,7 @@ mod tests {
                 addx -11
                 noop
                 noop
-                noop
-                ",
+                noop",
             ),
         }
     }
