@@ -18,3 +18,5 @@ pub mod eighth_puzzle;
 pub mod ninth_puzzle;
 #[path ="puzzles/10.rs"]
 pub mod tenth_puzzle;
+#[path ="puzzles/11.rs"]
+pub mod eleventh_puzzle;
