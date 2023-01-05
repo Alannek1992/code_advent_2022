@@ -1,9 +1,61 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::PuzzleInfo;
 
 pub struct EleventhPuzzle {
     puzzle: PuzzleInfo,
+}
+
+struct Jungle {
+    monkeys: HashMap<i32, Monkey>,
+}
+
+impl Jungle {
+    fn new(monkeys: Vec<Monkey>) -> Self {
+        let mut monkeys_as_map = HashMap::new();
+        for (idx, monkey) in monkeys.into_iter().enumerate() {
+            monkeys_as_map.insert(idx as i32, monkey);
+        }
+        Self {
+            monkeys: monkeys_as_map,
+        }
+    }
+}
+
+struct Monkey {
+    items: Vec<i32>,
+    operation: Operation,
+    test: TestDivisable,
+}
+
+impl Monkey {
+    fn new(items: Vec<i32>, operation: Operation, test: TestDivisable) -> Self {
+        Self {
+            items,
+            operation,
+            test,
+        }
+    }
+
+    fn throw_to_another_monkey(&mut self) -> Option<(i32, i32)> {
+        if self.items.is_empty() {
+            return None;
+        }
+        let item = self.items.remove(0);
+        let item = self.operation.execute(item) / 3;
+
+        let remainder = item % self.test.divider;
+        let receiver = if remainder == 0 {
+            self.test.success_receiver
+        } else {
+            self.test.fail_receiver
+        };
+        Some((item, receiver))
+    }
+
+    fn catch_new_item(&mut self, item: i32) {
+        self.items.push(item);
+    }
 }
 
 enum Operation {
@@ -13,7 +65,7 @@ enum Operation {
 }
 
 impl Operation {
-    fn execute_operation(&self, input: i32) -> i32 {
+    fn execute(&self, input: i32) -> i32 {
         match self {
             Operation::Plus(n) => input + n,
             Operation::Multiply(n) => input * n,
@@ -22,23 +74,25 @@ impl Operation {
     }
 }
 
-struct Monkey {
-    items: Vec<i32>,
-    operation: Operation,
-    test: fn(input: i32) -> i32,
+struct TestDivisable {
+    divider: i32,
+    success_receiver: i32,
+    fail_receiver: i32,
 }
 
-impl Monkey {
-    fn new(items: Vec<i32>, operation: fn(input: i32) -> i32, test: fn(input: i32) -> i32) -> Self {
+impl EleventhPuzzle {
+    pub fn new() -> Self {
         Self {
-            items,
-            operation,
-            test,
+            puzzle: PuzzleInfo::new("Eleventh Puzzle - Monkey in the Middle", "./inputs/11.txt"),
         }
     }
 
-    fn throw_to_another_monkey(&mut self) -> i32 {
-        let item = self.items.remove(0);
+    fn get_monkeys(&self) -> Vec<Monkey> {
+        let mut monkeys = Vec::new();
+
+
+
+        monkeys
     }
 }
 
