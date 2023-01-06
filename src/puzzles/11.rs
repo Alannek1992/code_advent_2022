@@ -1,4 +1,6 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+
+use regex::Regex;
 
 use crate::PuzzleInfo;
 
@@ -89,8 +91,25 @@ impl EleventhPuzzle {
 
     fn get_monkeys(&self) -> Vec<Monkey> {
         let mut monkeys = Vec::new();
+        let descriptions: Vec<&str> = self
+            .puzzle
+            .input
+            .split("Monkey")
+            .filter(|e| !e.is_empty())
+            .collect();
+        let re_items = Regex::new(r".*Starting items:.*\n").unwrap();
+        let re_item_no = Regex::new(r"\d+").unwrap();
 
+        for desc in descriptions.iter() {
+            let mut items = Vec::new();
+            let extracted_items_as_str = &re_items.captures(desc).unwrap()[0];
 
+            re_item_no
+                .captures_iter(extracted_items_as_str)
+                .for_each(|m| items.push(*&m[0].parse::<i32>().unwrap()));
+
+            println!("{:?}", items);
+        }
 
         monkeys
     }
@@ -101,6 +120,15 @@ mod tests {
     use crate::PuzzleInfo;
 
     use super::*;
+
+    #[test]
+    fn part_one() {
+        EleventhPuzzle {
+            puzzle: get_puzzle_info(),
+        }
+        .get_monkeys();
+        assert!(false);
+    }
 
     fn get_puzzle_info() -> PuzzleInfo {
         PuzzleInfo {
