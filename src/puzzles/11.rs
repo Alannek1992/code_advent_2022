@@ -1,11 +1,18 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use regex::Regex;
 
-use crate::PuzzleInfo;
+use crate::{util::print_solution, PuzzleInfo, Solution};
 
 pub struct EleventhPuzzle {
     puzzle: PuzzleInfo,
+}
+
+impl Solution for EleventhPuzzle {
+    fn solution(&self) {
+        print_solution(&self.puzzle.name, self.monkey_business(20), 0);
+    }
 }
 
 struct Jungle {
@@ -22,12 +29,33 @@ impl Jungle {
             monkeys: monkeys_as_map,
         }
     }
+
+    fn play_the_game(&mut self, rounds: i32) {
+        for _ in 0..rounds {
+            for i in 0..self.monkeys.len() as i32 {
+                loop {
+                    let monkey = match self.monkeys.get_mut(&i) {
+                        Some(m) => m,
+                        None => break,
+                    };
+                    let (item, receiver) = match monkey.throw_to_another_monkey() {
+                        Some(t) => t,
+                        None => break,
+                    };
+
+                    let monkey_receiver = self.monkeys.get_mut(&receiver).unwrap();
+                    monkey_receiver.catch_new_item(item);
+                }
+            }
+        }
+    }
 }
 
 struct Monkey {
     items: Vec<i32>,
     operation: Operation,
     test: TestDivisable,
+    inspect_count: i32,
 }
 
 impl Monkey {
@@ -36,6 +64,7 @@ impl Monkey {
             items,
             operation,
             test,
+            inspect_count: 0,
         }
     }
 
@@ -52,6 +81,7 @@ impl Monkey {
         } else {
             self.test.fail_receiver
         };
+        self.inspect_count += 1;
         Some((item, receiver))
     }
 
@@ -82,11 +112,34 @@ struct TestDivisable {
     fail_receiver: i32,
 }
 
+impl TestDivisable {
+    fn new(divider: i32, success_receiver: i32, fail_receiver: i32) -> Self {
+        Self {
+            divider,
+            success_receiver,
+            fail_receiver,
+        }
+    }
+}
+
 impl EleventhPuzzle {
     pub fn new() -> Self {
         Self {
             puzzle: PuzzleInfo::new("Eleventh Puzzle - Monkey in the Middle", "./inputs/11.txt"),
         }
+    }
+
+    fn monkey_business(&self, rounds: i32) -> i32 {
+        let mut jungle = Jungle::new(self.get_monkeys());
+        jungle.play_the_game(rounds);
+        let mut monkey_activities: Vec<i32> = jungle
+            .monkeys
+            .into_values()
+            .map(|m| m.inspect_count)
+            .sorted()
+            .collect();
+
+        monkey_activities.pop().unwrap() * monkey_activities.pop().unwrap()
     }
 
     fn get_monkeys(&self) -> Vec<Monkey> {
@@ -99,16 +152,43 @@ impl EleventhPuzzle {
             .collect();
         let re_items = Regex::new(r".*Starting items:.*\n").unwrap();
         let re_item_no = Regex::new(r"\d+").unwrap();
+        let re_operation = Regex::new(r".*old ([+*]) (old|\d+)").unwrap();
+        let re_test_divider = Regex::new(r".*by (\d+)").unwrap();
+        let re_test_true = Regex::new(r".*true.* (\d+)").unwrap();
+        let re_test_false = Regex::new(r".*false.* (\d+)").unwrap();
 
         for desc in descriptions.iter() {
             let mut items = Vec::new();
             let extracted_items_as_str = &re_items.captures(desc).unwrap()[0];
-
             re_item_no
                 .captures_iter(extracted_items_as_str)
                 .for_each(|m| items.push(*&m[0].parse::<i32>().unwrap()));
 
-            println!("{:?}", items);
+            let operation_captured = re_operation.captures(desc).unwrap();
+            let operator = &operation_captured[1].chars().next().unwrap();
+            let operation_value = &operation_captured[2];
+            let operation = match operator {
+                '+' => match operation_value.parse::<i32>() {
+                    Ok(n) => Operation::Plus(n),
+                    Err(_) => unreachable!(),
+                },
+                '*' => match operation_value.parse::<i32>() {
+                    Ok(n) => Operation::Multiply(n),
+                    Err(_) => Operation::Power,
+                },
+                _ => unreachable!(),
+            };
+
+            let test_divider_captured = re_test_divider.captures(desc).unwrap();
+            let test_true_captured = re_test_true.captures(desc).unwrap();
+            let test_false_captured = re_test_false.captures(desc).unwrap();
+            let test = TestDivisable::new(
+                *&test_divider_captured[1].parse().unwrap(),
+                *&test_true_captured[1].parse().unwrap(),
+                *&test_false_captured[1].parse().unwrap(),
+            );
+
+            monkeys.push(Monkey::new(items, operation, test));
         }
 
         monkeys
@@ -122,12 +202,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn part_one() {
-        EleventhPuzzle {
-            puzzle: get_puzzle_info(),
-        }
-        .get_monkeys();
-        assert!(false);
+    fn monkey_business() {
+        assert_eq!(
+            10605,
+            EleventhPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .monkey_business(20)
+        );
     }
 
     fn get_puzzle_info() -> PuzzleInfo {
