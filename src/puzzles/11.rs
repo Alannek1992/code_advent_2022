@@ -11,11 +11,7 @@ pub struct EleventhPuzzle {
 
 impl Solution for EleventhPuzzle {
     fn solution(&self) {
-        print_solution(
-            &self.puzzle.name,
-            self.monkey_business(20, EleventhPuzzle::division_by_three_compression),
-            0,
-        );
+        print_solution(&self.puzzle.name, self.get_jungle().monkey_business(20), 0);
     }
 }
 
@@ -34,7 +30,7 @@ impl Jungle {
         }
     }
 
-    fn play_the_game(&mut self, rounds: u64, compression: Compression) {
+    fn play_the_game(&mut self, rounds: u64) {
         for _ in 0..rounds {
             for i in 0..self.monkeys.len() as u64 {
                 loop {
@@ -42,7 +38,7 @@ impl Jungle {
                         Some(m) => m,
                         None => break,
                     };
-                    let (item, receiver) = match monkey.throw_to_another_monkey(compression) {
+                    let (item, receiver) = match monkey.throw_to_another_monkey() {
                         Some(t) => t,
                         None => break,
                     };
@@ -54,11 +50,11 @@ impl Jungle {
         }
     }
 
-    fn monkey_business(&self, rounds: u64) -> u64 {
-        jungle.play_the_game(rounds, compression);
-        let mut monkey_activities: Vec<u64> = jungle
+    fn monkey_business(&mut self, rounds: u64) -> u64 {
+        self.play_the_game(rounds);
+        let mut monkey_activities: Vec<u64> = self
             .monkeys
-            .into_values()
+            .values()
             .map(|m| m.inspect_count)
             .sorted()
             .collect();
@@ -75,21 +71,8 @@ impl Jungle {
     }
 }
 
-enum CompressionStrategy<'t> {
-    Division(u64),
-    Magic(&'t HashMap<u64, Monkey>)
-}
-
-impl CompressionStrategy {
-    fn execute(&self) -> u64 {
-        match self {
-            Self::Division(n) => 
-        }
-    }
-}
-
 struct Monkey {
-    items: Vec<u64>,
+    items: Vec<Vec<u8>>,
     operation: Operation,
     test: TestDivisable,
     inspect_count: u64,
@@ -97,21 +80,36 @@ struct Monkey {
 
 impl Monkey {
     fn new(items: Vec<u64>, operation: Operation, test: TestDivisable) -> Self {
+        let items_as_digits = Vec::new();
+        items.iter().for_each(|x| {
+            let item_as_digits = Vec::new();
+            let x= *x as u8;
+
+            loop {
+                item_as_digits.push(x % 10);
+                x /= 10;
+
+                if x == 0 {
+                    break;
+                }
+                item_as_digits.reverse();
+                items_as_digits.push(item_as_digits);
+            }
+        });
         Self {
-            items,
+            items: items_as_digits,
             operation,
             test,
             inspect_count: 0,
         }
     }
 
-    fn throw_to_another_monkey(&mut self, compression: Compression) -> Option<(u64, u64)> {
+    fn throw_to_another_monkey(&mut self) -> Option<(Vec<u8>, u64)> {
         if self.items.is_empty() {
             return None;
         }
         let item = self.items.remove(0);
-        let item = self.operation.execute(item);
-        let item = item;
+        let item = self.operation.execute(item) / 3;
 
         let remainder = item % self.test.divisor;
         let receiver = if remainder == 0 {
@@ -123,23 +121,21 @@ impl Monkey {
         Some((item, receiver))
     }
 
-    fn catch_new_item(&mut self, item: u64) {
+    fn catch_new_item(&mut self, item: Vec<u8>) {
         self.items.push(item);
     }
 }
 
-type Compression = fn(input: u64) -> u64;
-
 enum Operation {
-    Plus(u64),
-    Multiply(u64),
+    Plus(u8),
+    Multiply(u8),
     Square,
 }
 
 impl Operation {
-    fn execute(&self, input: u64) -> u64 {
+    fn execute(&self, input: Vec<u8>) -> Vec<u8> {
         match self {
-            Operation::Plus(n) => input + n,
+            Operation::Plus(n) => {input + n},
             Operation::Multiply(n) => input * n,
             Operation::Square => input * input,
         }
@@ -169,7 +165,7 @@ impl EleventhPuzzle {
         }
     }
 
-    fn get_monkeys(&self) -> Vec<Monkey> {
+    fn get_jungle(&self) -> Jungle {
         let mut monkeys = Vec::new();
         let descriptions: Vec<&str> = self
             .puzzle
@@ -195,11 +191,11 @@ impl EleventhPuzzle {
             let operator = &operation_captured[1].chars().next().unwrap();
             let operation_value = &operation_captured[2];
             let operation = match operator {
-                '+' => match operation_value.parse::<u64>() {
+                '+' => match operation_value.parse::<u8>() {
                     Ok(n) => Operation::Plus(n),
                     Err(_) => unreachable!(),
                 },
-                '*' => match operation_value.parse::<u64>() {
+                '*' => match operation_value.parse::<u8>() {
                     Ok(n) => Operation::Multiply(n),
                     Err(_) => Operation::Square,
                 },
@@ -218,7 +214,7 @@ impl EleventhPuzzle {
             monkeys.push(Monkey::new(items, operation, test));
         }
 
-        monkeys
+        Jungle::new(monkeys)
     }
 }
 
@@ -235,6 +231,7 @@ mod tests {
             EleventhPuzzle {
                 puzzle: get_puzzle_info(),
             }
+            .get_jungle()
             .monkey_business(10000)
         );
     }
@@ -246,6 +243,7 @@ mod tests {
             EleventhPuzzle {
                 puzzle: get_puzzle_info(),
             }
+            .get_jungle()
             .monkey_business(20)
         );
     }
