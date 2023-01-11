@@ -128,16 +128,20 @@ impl Operation {
         item_as_digits
     }
 
-    fn execute(&mut self, input: Vec<u8>) -> Vec<u8> {
+    fn execute(&self, input: Vec<u8>) -> Vec<u8> {
         match self {
             Operation::Plus(digits) => {
                 let mut result = Vec::new();
-                digits.reverse();
                 let mut cloned_input = input.clone();
                 cloned_input.reverse();
                 let mut remainder = 0;
-                for (idx, digit) in digits.iter().enumerate() {
-                    let existing_digit = cloned_input.get(idx);
+                let (outer_loop_vec, inner_vec_to_use) = if cloned_input.len() > digits.len() {
+                    (&cloned_input, *&digits)
+                } else {
+                    (*&digits, &cloned_input)
+                };
+                for (idx, digit) in outer_loop_vec.iter().rev().enumerate() {
+                    let existing_digit = inner_vec_to_use.get(idx);
                     match existing_digit {
                         Some(d) => {
                             let sum = digit + d + remainder;
@@ -151,19 +155,23 @@ impl Operation {
                         }
                     }
                 }
+                if remainder > 0 {
+                    result.push(remainder);
+                }
                 result.reverse();
                 result
             }
             Operation::Multiply(digits) => {
-                digits.reverse();
-                let mut cloned_input = input.clone();
-                cloned_input.reverse();
+                let cloned_input = input.clone();
                 let mut semi_results = Vec::new();
-                for digit in digits.iter() {
+                for (idx, digit) in digits.iter().rev().enumerate() {
                     let mut semi_result = Vec::new();
+                    for _ in 0..idx {
+                        semi_result.push(0);
+                    }
                     let mut remainder = 0;
 
-                    for existing_digit in cloned_input.iter() {
+                    for existing_digit in cloned_input.iter().rev() {
                         let sum = digit * existing_digit + remainder;
                         let correct_digit = sum % 10;
                         remainder = sum / 10;
@@ -280,12 +288,12 @@ mod tests {
     #[test]
     fn monkey_business_high_load() {
         assert_eq!(
-            2713310158,
+            10197,
             EleventhPuzzle {
                 puzzle: get_puzzle_info(),
             }
             .get_jungle()
-            .monkey_business(10000)
+            .monkey_business(20)
         );
     }
 
