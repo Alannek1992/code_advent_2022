@@ -16,7 +16,7 @@ impl Solution for EleventhPuzzle {
             self.get_jungle()
                 .monkey_business(20, CompressionKind::DivisonByThree),
             self.get_jungle()
-                .monkey_business(10000, CompressionKind::LeastCommonMultiple),
+                .monkey_business(10000, CompressionKind::ProductOfDivisors),
         );
     }
 }
@@ -39,7 +39,7 @@ impl Jungle {
     fn monkey_business(&mut self, rounds: u64, compression_kind: CompressionKind) -> u64 {
         let compressor = match compression_kind {
             CompressionKind::DivisonByThree => 3,
-            CompressionKind::LeastCommonMultiple => {
+            CompressionKind::ProductOfDivisors => {
                 self.monkeys.values().map(|m| m.test.divisor).product()
             }
         };
@@ -74,7 +74,7 @@ impl Jungle {
 
 enum CompressionKind {
     DivisonByThree,
-    LeastCommonMultiple,
+    ProductOfDivisors,
 }
 
 struct Monkey {
@@ -106,7 +106,7 @@ impl Monkey {
         let item = self.operation.execute(item);
         let item = match compression_kind {
             CompressionKind::DivisonByThree => item / compression,
-            CompressionKind::LeastCommonMultiple => item % compression,
+            CompressionKind::ProductOfDivisors => item % compression,
         };
 
         let receiver = if item % self.test.divisor == 0 {
@@ -229,7 +229,7 @@ mod tests {
                 puzzle: get_puzzle_info(),
             }
             .get_jungle()
-            .monkey_business(10000, CompressionKind::LeastCommonMultiple)
+            .monkey_business(10000, CompressionKind::ProductOfDivisors)
         );
     }
 
