@@ -11,7 +11,13 @@ pub struct EleventhPuzzle {
 
 impl Solution for EleventhPuzzle {
     fn solution(&self) {
-        print_solution(&self.puzzle.name, self.get_jungle().monkey_business(20), 0);
+        print_solution(
+            &self.puzzle.name,
+            self.get_jungle()
+                .monkey_business(20, CompressionKind::DivisonByThree),
+            self.get_jungle()
+                .monkey_business(10000, CompressionKind::ChineseRemainder),
+        );
     }
 }
 
@@ -30,7 +36,13 @@ impl Jungle {
         }
     }
 
-    fn play_the_game(&mut self, rounds: u64) {
+    fn monkey_business(&mut self, rounds: u64, compression_kind: CompressionKind) -> u64 {
+        let compressor = match compression_kind {
+            CompressionKind::DivisonByThree => 3,
+            CompressionKind::ChineseRemainder => {
+                self.monkeys.values().map(|m| m.test.divisor).product()
+            }
+        };
         for _ in 0..rounds {
             for i in 0..self.monkeys.len() as u8 {
                 loop {
@@ -38,20 +50,17 @@ impl Jungle {
                         Some(m) => m,
                         None => break,
                     };
-                    let (item, receiver) = match monkey.throw_to_another_monkey() {
-                        Some(t) => t,
-                        None => break,
-                    };
+                    let (item, receiver) =
+                        match monkey.throw_to_another_monkey(compressor, &compression_kind) {
+                            Some(t) => t,
+                            None => break,
+                        };
 
                     let monkey_receiver = self.monkeys.get_mut(&receiver).unwrap();
                     monkey_receiver.catch_new_item(item);
                 }
             }
         }
-    }
-
-    fn monkey_business(&mut self, rounds: u64) -> u64 {
-        self.play_the_game(rounds);
         let mut monkey_activities: Vec<u64> = self
             .monkeys
             .values()
@@ -63,35 +72,44 @@ impl Jungle {
     }
 }
 
+enum CompressionKind {
+    DivisonByThree,
+    ChineseRemainder,
+}
+
 struct Monkey {
-    items: Vec<Vec<u8>>,
+    items: Vec<u64>,
     operation: Operation,
     test: TestDivisable,
     inspect_count: u64,
 }
 
 impl Monkey {
-    fn new(items: Vec<u8>, operation: Operation, test: TestDivisable) -> Self {
-        let mut items_as_digits = Vec::new();
-        items
-            .iter()
-            .for_each(|x| items_as_digits.push(Operation::convert_num_to_digits(*x)));
+    fn new(items: Vec<u64>, operation: Operation, test: TestDivisable) -> Self {
         Self {
-            items: items_as_digits,
+            items,
             operation,
             test,
             inspect_count: 0,
         }
     }
 
-    fn throw_to_another_monkey(&mut self) -> Option<(Vec<u8>, u8)> {
+    fn throw_to_another_monkey(
+        &mut self,
+        compression: u64,
+        compression_kind: &CompressionKind,
+    ) -> Option<(u64, u8)> {
         if self.items.is_empty() {
             return None;
         }
         let item = self.items.remove(0);
         let item = self.operation.execute(item);
+        let item = match compression_kind {
+            CompressionKind::DivisonByThree => item / compression,
+            CompressionKind::ChineseRemainder => item % compression,
+        };
 
-        let receiver = if TestDivisable::is_divisable(&item, self.test.divisor) {
+        let receiver = if item % self.test.divisor == 0 {
             self.test.success_receiver
         } else {
             self.test.fail_receiver
@@ -100,122 +118,40 @@ impl Monkey {
         Some((item, receiver))
     }
 
-    fn catch_new_item(&mut self, item: Vec<u8>) {
+    fn catch_new_item(&mut self, item: u64) {
         self.items.push(item);
     }
 }
 
 enum Operation {
-    Plus(Vec<u8>),
-    Multiply(Vec<u8>),
+    Plus(u64),
+    Multiply(u64),
     Square,
 }
 
 impl Operation {
-    fn convert_num_to_digits(number: u8) -> Vec<u8> {
-        let mut item_as_digits = Vec::new();
-        let mut x = number;
-
-        loop {
-            item_as_digits.push(x % 10);
-            x /= 10;
-
-            if x == 0 {
-                break;
-            }
-        }
-        item_as_digits.reverse();
-        item_as_digits
-    }
-
-    fn execute(&self, input: Vec<u8>) -> Vec<u8> {
+    fn execute(&self, input: u64) -> u64 {
         match self {
-            Operation::Plus(digits) => {
-                let mut result = Vec::new();
-                let mut cloned_input = input.clone();
-                cloned_input.reverse();
-                let mut remainder = 0;
-                let (outer_loop_vec, inner_vec_to_use) = if cloned_input.len() > digits.len() {
-                    (&cloned_input, *&digits)
-                } else {
-                    (*&digits, &cloned_input)
-                };
-                for (idx, digit) in outer_loop_vec.iter().rev().enumerate() {
-                    let existing_digit = inner_vec_to_use.get(idx);
-                    match existing_digit {
-                        Some(d) => {
-                            let sum = digit + d + remainder;
-                            let correct_digit = sum % 10;
-                            remainder = sum / 10;
-                            result.push(correct_digit);
-                        }
-                        None => {
-                            result.push(digit + remainder);
-                            remainder = 0;
-                        }
-                    }
-                }
-                if remainder > 0 {
-                    result.push(remainder);
-                }
-                result.reverse();
-                result
-            }
-            Operation::Multiply(digits) => {
-                let cloned_input = input.clone();
-                let mut semi_results = Vec::new();
-                for (idx, digit) in digits.iter().rev().enumerate() {
-                    let mut semi_result = Vec::new();
-                    for _ in 0..idx {
-                        semi_result.push(0);
-                    }
-                    let mut remainder = 0;
-
-                    for existing_digit in cloned_input.iter().rev() {
-                        let sum = digit * existing_digit + remainder;
-                        let correct_digit = sum % 10;
-                        remainder = sum / 10;
-                        semi_result.push(correct_digit);
-                    }
-                    if remainder > 0 {
-                        semi_result.push(remainder);
-                    }
-                    semi_result.reverse();
-                    semi_results.push(semi_result);
-                }
-                let result = semi_results
-                    .into_iter()
-                    .reduce(|a, b| Operation::Plus(a).execute(b))
-                    .unwrap();
-
-                result
-            }
-            Operation::Square => Operation::Multiply(input.clone()).execute(input),
+            Operation::Plus(n) => n + input,
+            Operation::Multiply(n) => n * input,
+            Operation::Square => input * input,
         }
     }
 }
 
 struct TestDivisable {
-    divisor: u8,
+    divisor: u64,
     success_receiver: u8,
     fail_receiver: u8,
 }
 
 impl TestDivisable {
-    fn new(divisor: u8, success_receiver: u8, fail_receiver: u8) -> Self {
+    fn new(divisor: u64, success_receiver: u8, fail_receiver: u8) -> Self {
         Self {
             divisor,
             success_receiver,
             fail_receiver,
         }
-    }
-
-    fn is_divisable(number_as_digits: &Vec<u8>, divisor: u8) -> bool {
-        let mut remainder = 0;
-        for digit in number_as_digits.iter() {
-            remainder = (digit + remainder) % divisor;
-        }
-        remainder == 0
     }
 }
 
@@ -246,18 +182,18 @@ impl EleventhPuzzle {
             let extracted_items_as_str = &re_items.captures(desc).unwrap()[0];
             re_item_no
                 .captures_iter(extracted_items_as_str)
-                .for_each(|m| items.push(*&m[0].parse::<u8>().unwrap()));
+                .for_each(|m| items.push(*&m[0].parse::<u64>().unwrap()));
 
             let operation_captured = re_operation.captures(desc).unwrap();
             let operator = &operation_captured[1].chars().next().unwrap();
             let operation_value = &operation_captured[2];
             let operation = match operator {
-                '+' => match operation_value.parse::<u8>() {
-                    Ok(n) => Operation::Plus(Operation::convert_num_to_digits(n)),
+                '+' => match operation_value.parse::<u64>() {
+                    Ok(n) => Operation::Plus(n),
                     Err(_) => unreachable!(),
                 },
-                '*' => match operation_value.parse::<u8>() {
-                    Ok(n) => Operation::Multiply(Operation::convert_num_to_digits(n)),
+                '*' => match operation_value.parse::<u64>() {
+                    Ok(n) => Operation::Multiply(n),
                     Err(_) => Operation::Square,
                 },
                 _ => unreachable!(),
@@ -288,12 +224,12 @@ mod tests {
     #[test]
     fn monkey_business_high_load() {
         assert_eq!(
-            10197,
+            2713310158,
             EleventhPuzzle {
                 puzzle: get_puzzle_info(),
             }
             .get_jungle()
-            .monkey_business(20)
+            .monkey_business(10000, CompressionKind::ChineseRemainder)
         );
     }
 
@@ -305,7 +241,7 @@ mod tests {
                 puzzle: get_puzzle_info(),
             }
             .get_jungle()
-            .monkey_business(20)
+            .monkey_business(20, CompressionKind::DivisonByThree)
         );
     }
 
