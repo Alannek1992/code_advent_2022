@@ -1,5 +1,6 @@
-use core::panic;
 use std::collections::{HashMap, HashSet};
+
+use itertools::Itertools;
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
 
@@ -9,7 +10,11 @@ pub struct TwelfthPuzzle {
 
 impl Solution for TwelfthPuzzle {
     fn solution(&self) {
-        print_solution(&self.puzzle.name, self.bfs_steps_needed(), 0);
+        print_solution(
+            &self.puzzle.name,
+            self.fewer_steps_from_one_starting_location(),
+            self.fewer_steps_from_multiple_starting_locations(),
+        );
     }
 }
 
@@ -94,22 +99,44 @@ impl TwelfthPuzzle {
         }
     }
 
-    fn bfs_steps_needed(&self) -> u32 {
+    fn fewer_steps_from_one_starting_location(&self) -> u32 {
         let heightmap = self.read_heightmap();
+        let starting_location = heightmap.iter().find(|(_, value)| **value == 'S').unwrap();
+        let starting_location = (*starting_location.0, *starting_location.1);
+        self.bfs(&heightmap, starting_location).unwrap()
+    }
+
+    fn fewer_steps_from_multiple_starting_locations(&self) -> u32 {
+        let heightmap = self.read_heightmap();
+        heightmap
+            .iter()
+            .filter(|(_, value)| **value == 'S' || **value == 'a')
+            .map(|starting_loc| {
+                let starting_location = (*starting_loc.0, *starting_loc.1);
+                self.bfs(&heightmap, starting_location)
+            })
+            .filter_map(|opt_result| opt_result)
+            .min()
+            .unwrap()
+    }
+
+    fn bfs(
+        &self,
+        heightmap: &HashMap<Location, Movement>,
+        starting_location: (Location, Movement),
+    ) -> Option<u32> {
         let mut visited_locations = HashSet::new();
         let mut queue = Queue::new();
 
-        let starting_location = heightmap.iter().find(|(_, value)| **value == 'S').unwrap();
-
-        let starting_location = QItem::new(*starting_location.0, *starting_location.1, 0);
-        visited_locations.insert(starting_location.location);
-        queue.enqueue(starting_location);
+        let start = QItem::new(starting_location.0, starting_location.1, 0);
+        visited_locations.insert(start.location);
+        queue.enqueue(start);
 
         while !queue.is_empty() {
             let item = queue.dequeue().unwrap();
 
             if item.is_destination() {
-                return item.distance;
+                return Some(item.distance);
             }
 
             for adjacent_location in item.get_adjacent_locations() {
@@ -131,7 +158,7 @@ impl TwelfthPuzzle {
                 }
             }
         }
-        panic!("Solution not found!");
+        None
     }
 
     fn read_heightmap(&self) -> HashMap<Location, Movement> {
@@ -154,13 +181,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bfs_steps_needed() {
+    fn fewer_steps_from_one_starting_location() {
         assert_eq!(
             31,
             TwelfthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .bfs_steps_needed()
+            .fewer_steps_from_one_starting_location()
+        );
+    }
+
+    #[test]
+    fn fewer_steps_from_multiple_starting_locations() {
+        assert_eq!(
+            29,
+            TwelfthPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .fewer_steps_from_multiple_starting_locations()
         );
     }
 
