@@ -1,9 +1,16 @@
+use core::panic;
 use std::collections::{HashMap, HashSet};
 
-use crate::PuzzleInfo;
+use crate::{util::print_solution, PuzzleInfo, Solution};
 
 pub struct TwelfthPuzzle {
     puzzle: PuzzleInfo,
+}
+
+impl Solution for TwelfthPuzzle {
+    fn solution(&self) {
+        print_solution(&self.puzzle.name, self.bfs_steps_needed(), 0);
+    }
 }
 
 struct Queue<T> {
@@ -34,11 +41,11 @@ impl<T> Queue<T> {
 struct QItem {
     location: Location,
     movement: Movement,
-    distance: u8,
+    distance: u32,
 }
 
 impl QItem {
-    fn new(location: Location, movement: Movement, distance: u8) -> Self {
+    fn new(location: Location, movement: Movement, distance: u32) -> Self {
         Self {
             location,
             movement,
@@ -50,12 +57,27 @@ impl QItem {
         self.movement == 'E'
     }
 
-    fn is_start(&self) -> bool {
-        self.movement == 'S'
+    fn get_adjacent_locations(&self) -> Vec<Location> {
+        let mut adj_locations = vec![
+            (self.location.0, self.location.1 + 1),
+            (self.location.0 + 1, self.location.1),
+        ];
+        if self.location.0 > 0 {
+            adj_locations.push((self.location.0 - 1, self.location.1));
+        }
+        if self.location.1 > 0 {
+            adj_locations.push((self.location.0, self.location.1 - 1));
+        }
+
+        adj_locations
     }
 
-    fn get_adjacent_locations(&self) -> Vec<Location> {
-        let mut adjacents = Vec::new();
+    fn interpret_elevation(elevation: char) -> u8 {
+        match elevation {
+            'E' => 'z' as u8,
+            'S' => 'a' as u8,
+            _ => elevation as u8,
+        }
     }
 }
 
@@ -72,19 +94,44 @@ impl TwelfthPuzzle {
         }
     }
 
-    fn bfs_steps_needed(&self) {
+    fn bfs_steps_needed(&self) -> u32 {
         let heightmap = self.read_heightmap();
         let mut visited_locations = HashSet::new();
         let mut queue = Queue::new();
 
-        let starting_location = QItem::new((0, 0), 'S', 0);
+        let starting_location = heightmap.iter().find(|(_, value)| **value == 'S').unwrap();
+
+        let starting_location = QItem::new(*starting_location.0, *starting_location.1, 0);
         visited_locations.insert(starting_location.location);
         queue.enqueue(starting_location);
 
         while !queue.is_empty() {
             let item = queue.dequeue().unwrap();
 
+            if item.is_destination() {
+                return item.distance;
+            }
+
+            for adjacent_location in item.get_adjacent_locations() {
+                match heightmap.get(&adjacent_location) {
+                    Some(movement) => {
+                        if QItem::interpret_elevation(item.movement) + 1
+                            >= QItem::interpret_elevation(*movement)
+                            && !visited_locations.contains(&adjacent_location)
+                        {
+                            queue.enqueue(QItem::new(
+                                adjacent_location,
+                                *movement,
+                                item.distance + 1,
+                            ));
+                            visited_locations.insert(adjacent_location);
+                        }
+                    }
+                    None => continue,
+                }
+            }
         }
+        panic!("Solution not found!");
     }
 
     fn read_heightmap(&self) -> HashMap<Location, Movement> {
@@ -108,11 +155,13 @@ mod tests {
 
     #[test]
     fn bfs_steps_needed() {
-        TwelfthPuzzle {
-            puzzle: get_puzzle_info(),
-        }
-        .bfs_steps_needed();
-        assert!(false);
+        assert_eq!(
+            31,
+            TwelfthPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .bfs_steps_needed()
+        );
     }
 
     fn get_puzzle_info() -> PuzzleInfo {
