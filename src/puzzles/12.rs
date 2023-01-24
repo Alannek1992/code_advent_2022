@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use itertools::Itertools;
-
 use crate::{util::print_solution, PuzzleInfo, Solution};
 
 pub struct TwelfthPuzzle {
