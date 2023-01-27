@@ -1,4 +1,4 @@
-use regex::Regex;
+use std::str::Chars;
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
 
@@ -13,8 +13,29 @@ impl Solution for ThirteenthPuzzle {
 }
 
 type PacketPair = (Packet, Packet);
-type Packet = Vec<PacketValue>;
-type PacketValue = Vec<u8>;
+
+#[derive(Debug)]
+enum Packet {
+    Number(u8),
+    List(Vec<Self>),
+}
+
+impl Packet {
+    fn add(&mut self, value: Self) {
+        match self {
+            Self::List(l) => l.push(value),
+            _ => panic!("Adding value to a number packet"),
+        }
+    }
+}
+
+trait Comparison {
+    fn compare(&self, another_packet: &Packet) -> ComparisonKind;
+}
+
+/*impl Comparison for Packet {
+    fn compare(&self, another_packet: &Packet) -> ComparisonKind {}
+}*/
 
 enum ComparisonKind {
     Smaller,
@@ -31,20 +52,21 @@ impl ThirteenthPuzzle {
 
     fn sum_of_pairs_in_right_order(&self) -> u32 {
         let packets = self.read_packets();
+        println!("{:?}", packets);
         /*let mut sum_of_pairs_in_right_order = 0;
 
         for (idx, (left_side, right_side)) in packets.iter().enumerate() {
             let mut accessor = 0;
 
             loop {
-                let left_side_values = match left_side.values.get(accessor) {
+                let left_side_values = match left_side.get(accessor) {
                     Some(n) => n,
                     None => {
                         sum_of_pairs_in_right_order += idx + 1;
                         break;
                     }
                 };
-                let right_side_values = match right_side.values.get(accessor) {
+                let right_side_values = match right_side.get(accessor) {
                     Some(n) => n,
                     None => break,
                 };
@@ -57,7 +79,9 @@ impl ThirteenthPuzzle {
                     ComparisonKind::Greater => break,
                     ComparisonKind::Equal => accessor += 1,
                 };
-            }*/
+            }
+        }
+        sum_of_pairs_in_right_order as u32*/
         10
     }
 
@@ -73,64 +97,51 @@ impl ThirteenthPuzzle {
         input
             .chunks(2)
             .map(|chunk| {
+                let first_chunk_iter = &mut chunk[0].chars();
+                first_chunk_iter.next();
+                first_chunk_iter.next_back();
+
+                let second_chunk_iter = &mut chunk[1].chars();
+                second_chunk_iter.next();
+                second_chunk_iter.next_back();
                 (
-                    self.read_packet_data(&chunk[0]),
-                    self.read_packet_data(&chunk[1]),
+                    self.read_packet(first_chunk_iter),
+                    self.read_packet(second_chunk_iter),
                 )
             })
             .collect()
     }
 
-    fn read_packet_data(&self, input: &str) -> Packet {
-        let mut strs = Vec::new();
-        let mut acc_str = String::new();
-        let mut previous_char = '*';
-        let empty_list_code = ",255,";
-
-        for c in input.chars() {
+    fn read_packet(&self, iterator: &mut Chars) -> Packet {
+        let mut packet = Packet::List(Vec::new());
+        let mut acc_number = String::new();
+        loop {
+            let c = match iterator.next() {
+                Some(c) => c,
+                None => break,
+            };
             match c {
                 '[' => {
-                    strs.push(acc_str.clone());
-                    acc_str.clear();
+                    packet.add(self.read_packet(iterator));
                 }
                 ']' => {
-                    if previous_char == '[' {
-                        acc_str.push_str(empty_list_code);
-                        continue;
+                    if !acc_number.is_empty() {
+                        packet.add(Packet::Number(acc_number.parse().unwrap()));
                     }
-                    strs.push(acc_str.clone());
-                    acc_str.clear();
+                    return packet;
                 }
-                _ => acc_str.push(c),
+                ',' => {
+                    if !acc_number.is_empty() {
+                        packet.add(Packet::Number(acc_number.parse().unwrap()));
+                        acc_number.clear();
+                    }
+                }
+                _ => acc_number.push(c),
             };
-            previous_char = c;
         }
-
-        if !acc_str.is_empty() {
-            strs.push(acc_str.clone());
+        if !acc_number.is_empty() {
+            packet.add(Packet::Number(acc_number.parse().unwrap()));
         }
-
-        let mut packet = Packet::new();
-        let re_number = Regex::new(r"\d+").unwrap();
-
-        for finding in strs {
-            let mut numbers = Vec::new();
-            for capture in re_number.captures_iter(&finding) {
-                let number = capture[0].parse::<u8>().unwrap();
-                numbers.push(number);
-            }
-            if !numbers.is_empty() {
-                packet.push(
-                    numbers
-                        .into_iter()
-                        .filter(|number| *number != 255)
-                        .collect(),
-                );
-            }
-        }
-
-        println!("{:?}", packet);
-
         packet
     }
 }
