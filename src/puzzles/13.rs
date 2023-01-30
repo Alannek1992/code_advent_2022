@@ -1,4 +1,4 @@
-use std::str::Chars;
+use std::{cmp::Ordering, str::Chars};
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
 
@@ -8,13 +8,13 @@ pub struct ThirteenthPuzzle {
 
 impl Solution for ThirteenthPuzzle {
     fn solution(&self) {
-        print_solution(&self.puzzle.name, self.sum_of_pairs_in_right_order(), 0);
+        print_solution(&self.puzzle.name, self.sum_of_pairs_in_right_order(), self.decoder_key());
     }
 }
 
 type PacketPair = (Packet, Packet);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum Packet {
     Number(u8),
     List(Vec<Self>),
@@ -29,18 +29,34 @@ impl Packet {
     }
 }
 
-trait Comparison {
-    fn compare(&self, another_packet: &Packet) -> ComparisonKind;
+impl PartialOrd for Packet {
+    fn partial_cmp(&self, another_packet: &Packet) -> Option<Ordering> {
+        match (self, another_packet) {
+            (Packet::Number(n), Packet::Number(m)) => n.partial_cmp(m),
+            (Packet::Number(n), packet) => {
+                Packet::List(vec![Packet::Number(*n)]).partial_cmp(packet)
+            }
+            (packet, Packet::Number(n)) => {
+                packet.partial_cmp(&Packet::List(vec![Packet::Number(*n)]))
+            }
+            (Packet::List(left), Packet::List(right)) => {
+                let mut result = left.len().partial_cmp(&right.len());
+                for (n, m) in left.iter().zip(right) {
+                    if n.partial_cmp(m).unwrap() != Ordering::Equal {
+                        result = n.partial_cmp(m);
+                        break;
+                    }
+                }
+                result
+            }
+        }
+    }
 }
 
-/*impl Comparison for Packet {
-    fn compare(&self, another_packet: &Packet) -> ComparisonKind {}
-}*/
-
-enum ComparisonKind {
-    Smaller,
-    Greater,
-    Equal,
+impl Ord for Packet {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl ThirteenthPuzzle {
@@ -52,37 +68,40 @@ impl ThirteenthPuzzle {
 
     fn sum_of_pairs_in_right_order(&self) -> u32 {
         let packets = self.read_packets();
-        println!("{:?}", packets);
-        /*let mut sum_of_pairs_in_right_order = 0;
+        let mut sum_of_pairs_in_right_order = 0;
 
         for (idx, (left_side, right_side)) in packets.iter().enumerate() {
-            let mut accessor = 0;
-
-            loop {
-                let left_side_values = match left_side.get(accessor) {
-                    Some(n) => n,
-                    None => {
-                        sum_of_pairs_in_right_order += idx + 1;
-                        break;
-                    }
-                };
-                let right_side_values = match right_side.get(accessor) {
-                    Some(n) => n,
-                    None => break,
-                };
-
-                match left_side_values.compare(right_side_values) {
-                    ComparisonKind::Smaller => {
-                        sum_of_pairs_in_right_order += idx + 1;
-                        break;
-                    }
-                    ComparisonKind::Greater => break,
-                    ComparisonKind::Equal => accessor += 1,
-                };
+            if left_side < right_side {
+                sum_of_pairs_in_right_order += idx + 1;
             }
         }
-        sum_of_pairs_in_right_order as u32*/
-        10
+        sum_of_pairs_in_right_order as u32
+    }
+
+    fn decoder_key(&self) -> u32 {
+        let mut sorted_packets = Vec::new();
+        self.read_packets().into_iter().for_each(|(left, right)| {
+            sorted_packets.push(left);
+            sorted_packets.push(right);
+        });
+        let dividers = [Packet::List(vec![Packet::Number(2)]),Packet::List(vec![Packet::Number(6)])];
+        sorted_packets.extend_from_slice(&dividers);
+        sorted_packets.sort();
+
+        let mut sum_of_pairs_in_right_order = 0;
+
+        for (idx, p) in sorted_packets.iter().enumerate() {
+            if dividers[0].cmp(p) == Ordering::Equal {
+                sum_of_pairs_in_right_order += idx + 1;
+            }
+
+            if dividers[1].cmp(p) == Ordering::Equal {
+                sum_of_pairs_in_right_order *= idx + 1;
+                break;
+            }
+        }
+
+        sum_of_pairs_in_right_order as u32
     }
 
     fn read_packets(&self) -> Vec<PacketPair> {
@@ -153,13 +172,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn part_one() {
+    fn sum_of_pairs_in_right_order() {
         assert_eq!(
             13,
             ThirteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
             .sum_of_pairs_in_right_order()
+        );
+    }
+
+    #[test]
+    fn decoder_key() {
+        assert_eq!(
+            140,
+            ThirteenthPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .decoder_key()
         );
     }
 
@@ -189,10 +219,7 @@ mod tests {
                 [[]]
                 
                 [1,[2,[3,[4,[5,6,7]]]],8,9]
-                [1,[2,[3,[4,[5,6,0]]]],8,9]
-                
-                [[1,[0,3,5,[2,1,3,3,5]],4,[[],5]],[],[0,[7,[5],7,7]]]
-                [[[],[[],[5,2,8,9,7],1,5],[3,[]]]]",
+                [1,[2,[3,[4,[5,6,0]]]],8,9]",
             ),
         }
     }
