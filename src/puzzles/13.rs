@@ -81,8 +81,7 @@ impl ThirteenthPuzzle {
     fn decoder_key(&self) -> u32 {
         let mut sorted_packets = Vec::new();
         self.read_packets().into_iter().for_each(|(left, right)| {
-            sorted_packets.push(left);
-            sorted_packets.push(right);
+            sorted_packets.extend_from_slice(&[left, right]);
         });
         let dividers = [Packet::List(vec![Packet::Number(2)]),Packet::List(vec![Packet::Number(6)])];
         sorted_packets.extend_from_slice(&dividers);
