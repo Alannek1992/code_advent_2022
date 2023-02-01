@@ -3,10 +3,20 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use regex::Regex;
 
-use crate::PuzzleInfo;
+use crate::{util::print_solution, PuzzleInfo, Solution};
 
 pub struct FourteenthPuzzle {
     puzzle: PuzzleInfo,
+}
+
+impl Solution for FourteenthPuzzle {
+    fn solution(&self) {
+        print_solution(
+            &self.puzzle.name,
+            self.sand_coming_to_the_rest(FloorKind::Infinite),
+            0,
+        );
+    }
 }
 
 type Coordinate = (i16, i16);
@@ -55,63 +65,104 @@ impl FillLine for Coordinate {
     }
 }
 
-type Sand = Coordinate;
-
-trait Spread {
-    fn spread_to_coordinate(
-        &self,
-        starting_coordinate: Coordinate,
-        available_coordinates: &HashSet<Coordinate>,
-        existing_sand: &mut HashSet<Sand>,
-    ) -> Result<(), ()>;
+struct Sand {
+    available_coordinates: HashSet<Coordinate>,
+    max_allowed_y: i16,
+    spreaded_sand: HashSet<Coordinate>,
+    floor_kind: FloorKind,
 }
 
-// confused lines and cols - TODO fix
-
-impl Spread for Sand {
-    fn spread_to_coordinate(
-        &self,
-        starting_coordinate: Coordinate,
-        available_coordinates: &HashSet<Coordinate>,
-        existing_sand: &mut HashSet<Sand>,
-    ) -> Result<(), ()> {
-        let max_line_allowed = available_coordinates.iter().max().unwrap().0;
-
-        if starting_coordinate.0 <= max_line_allowed {
-            return Err(());
+impl Sand {
+    fn new(available_coordinates: HashSet<Coordinate>, floor_kind: FloorKind) -> Self {
+        let mut max_allowed_y = *available_coordinates.iter().map(|(_, y)| y).max().unwrap();
+        match floor_kind {
+            FloorKind::Solid => max_allowed_y += 2,
+            _ => {}
         }
 
-        match available_coordinates.get(&(starting_coordinate.0 - 1, starting_coordinate.1)) {
+        Self {
+            available_coordinates,
+            max_allowed_y,
+            spreaded_sand: HashSet::new(),
+            floor_kind,
+        }
+    }
+
+    fn populate_spreaded_sand(&mut self) {
+        let starting_coordinate = (500, 0);
+        loop {
+            match self.spread(starting_coordinate) {
+                Ok(()) => continue,
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn spread(&mut self, coordinate: Coordinate) -> Result<(), ErrorKind> {
+        let mut all_coordinates = HashSet::from(self.available_coordinates.clone());
+        all_coordinates.extend(self.spreaded_sand.clone());
+
+        if all_coordinates.contains(&coordinate) {
+            return Err(ErrorKind::NotSpace);
+        }
+
+        if coordinate.1 >= self.max_allowed_y {
+            match self.floor_kind {
+                FloorKind::Infinite => return Err(ErrorKind::FallingForever),
+                FloorKind::Solid => return Err(ErrorKind::NotSpace),
+            }
+        }
+
+        if coordinate == (500, 0) && all_coordinates.contains(&coordinate) {
+            return Err(ErrorKind::BlockedSource);
+        }
+
+        match self.floor_kind {
+            FloorKind::Solid => {
+                if coordinate.1 + 1 == self.max_allowed_y {
+                    self.spreaded_sand.insert(coordinate);
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
+        match all_coordinates.get(&(coordinate.0, coordinate.1 + 1)) {
             Some(c) => {
-                if !existing_sand.contains(&starting_coordinate) {
-                    existing_sand.insert(starting_coordinate);
+                if all_coordinates.contains(&(coordinate.0, coordinate.1 + 1))
+                    && all_coordinates.contains(&(coordinate.0 - 1, coordinate.1 + 1))
+                    && all_coordinates.contains(&(coordinate.0 + 1, coordinate.1 + 1))
+                {
+                    self.spreaded_sand.insert(coordinate);
                     return Ok(());
                 }
 
-                // left diagonal
-                match self.spread_to_coordinate(
-                    (c.0, c.1 - 1),
-                    available_coordinates,
-                    existing_sand,
-                ) {
-                    Ok(()) => return Ok(()),
-                    Err(()) => match self.spread_to_coordinate(
-                        (c.0, c.1 + 1),
-                        available_coordinates,
-                        existing_sand,
-                    ) {
-                        Ok(()) => return Ok(()),
-                        Err(()) => return Err(()),
+                match self.spread((c.0 - 1, c.1)) {
+                    Ok(()) => Ok(()),
+                    Err(kind) => match kind {
+                        ErrorKind::NotSpace => match self.spread((c.0 + 1, c.1)) {
+                            Ok(()) => Ok(()),
+                            Err(kind) => Err(kind),
+                        },
+                        ErrorKind::FallingForever => Err(kind),
+                        ErrorKind::BlockedSource => Err(kind),
                     },
                 }
             }
-            None => self.spread_to_coordinate(
-                (starting_coordinate.0 - 1, starting_coordinate.1),
-                available_coordinates,
-                existing_sand,
-            ),
+            None => self.spread((coordinate.0, coordinate.1 + 1)),
         }
     }
+}
+
+enum ErrorKind {
+    FallingForever,
+    NotSpace,
+    BlockedSource,
+}
+
+enum FloorKind {
+    Infinite,
+    Solid,
 }
 
 impl FourteenthPuzzle {
@@ -121,23 +172,11 @@ impl FourteenthPuzzle {
         }
     }
 
-    fn sand_coming_to_the_rest(&self) -> usize {
-        let mut sand_to_rest = HashSet::new();
-        let available_coordinates = self.scan_path();
-        loop {
-            match ((500 as i16, 500 as i16) as Sand).spread_to_coordinate(
-                (500, 500),
-                &available_coordinates,
-                &mut sand_to_rest,
-            ) {
-                Err(()) => break,
-                _ => {}
-            }
-        }
-
-        println!("{:?}", sand_to_rest);
-
-        10
+    fn sand_coming_to_the_rest(&self, kind: FloorKind) -> usize {
+        let coordinates = self.scan_path();
+        let mut sand = Sand::new(coordinates, kind);
+        sand.populate_spreaded_sand();
+        sand.spreaded_sand.len()
     }
 
     fn scan_path(&self) -> HashSet<Coordinate> {
@@ -173,13 +212,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn part_one() {
+    fn sand_to_rest_till_source_is_blocked() {
+        assert_eq!(
+            93,
+            FourteenthPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .sand_coming_to_the_rest(FloorKind::Solid)
+        );
+    }
+
+    #[test]
+    fn sand_coming_to_the_rest() {
         assert_eq!(
             24,
             FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_coming_to_the_rest()
+            .sand_coming_to_the_rest(FloorKind::Infinite)
         );
     }
 
