@@ -65,92 +65,63 @@ impl FillLine for Coordinate {
     }
 }
 
-struct Sand {
-    available_coordinates: HashSet<Coordinate>,
+struct WaterfallPath {
+    tiles: HashSet<Coordinate>,
     max_allowed_y: i16,
-    spreaded_sand: HashSet<Coordinate>,
     floor_kind: FloorKind,
 }
 
-impl Sand {
-    fn new(available_coordinates: HashSet<Coordinate>, floor_kind: FloorKind) -> Self {
-        let mut max_allowed_y = *available_coordinates.iter().map(|(_, y)| y).max().unwrap();
+impl WaterfallPath {
+    fn new(tiles: HashSet<Coordinate>, floor_kind: FloorKind) -> Self {
+        let mut max_allowed_y = *tiles.iter().map(|(_, y)| y).max().unwrap();
         match floor_kind {
             FloorKind::Solid => max_allowed_y += 2,
             _ => {}
         }
 
         Self {
-            available_coordinates,
+            tiles,
             max_allowed_y,
-            spreaded_sand: HashSet::new(),
             floor_kind,
         }
     }
+}
 
-    fn populate_spreaded_sand(&mut self) {
-        let starting_coordinate = (500, 0);
-        loop {
-            match self.spread(starting_coordinate) {
-                Ok(()) => continue,
-                Err(_) => break,
-            }
+trait Sand {
+    fn spread(
+        &mut self,
+        existing_coordinates: &HashSet<Coordinate>,
+    ) -> Result<Coordinate, ErrorKind>;
+    fn get_floor_coordinate(
+        &self,
+        current_x: i16,
+        existing_coordinates: &HashSet<Coordinate>,
+    ) -> Option<Coordinate>;
+}
+
+impl Sand for Coordinate {
+    fn spread(
+        &mut self,
+        existing_coordinates: &HashSet<Coordinate>,
+    ) -> Result<Coordinate, ErrorKind> {
+        let left_occupied = existing_coordinates.contains(&(self.0 - 1, self.1));
+        let right_occupied = existing_coordinates.contains(&(self.0 - 1, self.1));
+
+        let coord = match (left_occupied, right_occupied) {
+            (true, false) => self.get_floor_coordinate(current_y, existing_coordinates)
         }
     }
 
-    fn spread(&mut self, coordinate: Coordinate) -> Result<(), ErrorKind> {
-        let mut all_coordinates = HashSet::from(self.available_coordinates.clone());
-        all_coordinates.extend(self.spreaded_sand.clone());
-
-        if all_coordinates.contains(&coordinate) {
-            return Err(ErrorKind::NotSpace);
-        }
-
-        if coordinate.1 >= self.max_allowed_y {
-            match self.floor_kind {
-                FloorKind::Infinite => return Err(ErrorKind::FallingForever),
-                FloorKind::Solid => return Err(ErrorKind::NotSpace),
-            }
-        }
-
-        if coordinate == (500, 0) && all_coordinates.contains(&coordinate) {
-            return Err(ErrorKind::BlockedSource);
-        }
-
-        match self.floor_kind {
-            FloorKind::Solid => {
-                if coordinate.1 + 1 == self.max_allowed_y {
-                    self.spreaded_sand.insert(coordinate);
-                    return Ok(());
-                }
-            }
-            _ => {}
-        }
-
-        match all_coordinates.get(&(coordinate.0, coordinate.1 + 1)) {
-            Some(c) => {
-                if all_coordinates.contains(&(coordinate.0, coordinate.1 + 1))
-                    && all_coordinates.contains(&(coordinate.0 - 1, coordinate.1 + 1))
-                    && all_coordinates.contains(&(coordinate.0 + 1, coordinate.1 + 1))
-                {
-                    self.spreaded_sand.insert(coordinate);
-                    return Ok(());
-                }
-
-                match self.spread((c.0 - 1, c.1)) {
-                    Ok(()) => Ok(()),
-                    Err(kind) => match kind {
-                        ErrorKind::NotSpace => match self.spread((c.0 + 1, c.1)) {
-                            Ok(()) => Ok(()),
-                            Err(kind) => Err(kind),
-                        },
-                        ErrorKind::FallingForever => Err(kind),
-                        ErrorKind::BlockedSource => Err(kind),
-                    },
-                }
-            }
-            None => self.spread((coordinate.0, coordinate.1 + 1)),
-        }
+    fn get_floor_coordinate(
+        &self,
+        current_x: i16,
+        existing_coordinates: &HashSet<Coordinate>,
+    ) -> Option<Coordinate> {
+        existing_coordinates
+            .iter()
+            .filter(|(x, _)| *x == current_x)
+            .max()
+            .copied()
     }
 }
 
@@ -238,7 +209,7 @@ mod tests {
             name: String::from("Test"),
             input: String::from(
                 "498,4 -> 498,6 -> 496,6
-503,4 -> 502,4 -> 502,9 -> 494,9",
+                503,4 -> 502,4 -> 502,9 -> 494,9",
             ),
         }
     }
