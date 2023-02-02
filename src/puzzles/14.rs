@@ -11,11 +11,7 @@ pub struct FourteenthPuzzle {
 
 impl Solution for FourteenthPuzzle {
     fn solution(&self) {
-        print_solution(
-            &self.puzzle.name,
-            self.sand_coming_to_the_rest(FloorKind::Infinite),
-            0,
-        );
+        print_solution(&self.puzzle.name, self.sand_coming_to_the_rest(), 0);
     }
 }
 
@@ -65,75 +61,100 @@ impl FillLine for Coordinate {
     }
 }
 
-struct WaterfallPath {
-    tiles: HashSet<Coordinate>,
-    max_allowed_y: i16,
-    floor_kind: FloorKind,
+struct Tringle {
+    coordinates: HashSet<Coordinate>,
+    height: i16,
 }
 
-impl WaterfallPath {
-    fn new(tiles: HashSet<Coordinate>, floor_kind: FloorKind) -> Self {
-        let mut max_allowed_y = *tiles.iter().map(|(_, y)| y).max().unwrap();
-        match floor_kind {
-            FloorKind::Solid => max_allowed_y += 2,
-            _ => {}
-        }
+impl Tringle {
+    fn new(coordinates: HashSet<Coordinate>) -> Self {
+        let height = *coordinates.iter().map(|(_, y)| y).max().unwrap();
 
         Self {
-            tiles,
-            max_allowed_y,
-            floor_kind,
+            coordinates,
+            height,
+        }
+    }
+
+    fn spread_the_coordinates(&mut self) {
+        let starting_height = *self.coordinates.iter().map(|(_, y)| y).min().unwrap();
+        let mut starting_coordinate: Coordinate = (500, starting_height - 1);
+
+        loop {
+            match starting_coordinate.spread(&self.coordinates, self.height) {
+                Ok(c) => {
+                    self.coordinates.insert(c);
+                }
+                Err(kind) => match kind {
+                    ErrorKind::NotSpace => starting_coordinate.1 -= 1,
+                    ErrorKind::FallingForever => break,
+                },
+            }
         }
     }
 }
 
 trait Sand {
     fn spread(
-        &mut self,
-        existing_coordinates: &HashSet<Coordinate>,
-    ) -> Result<Coordinate, ErrorKind>;
-    fn get_floor_coordinate(
         &self,
-        current_x: i16,
-        existing_coordinates: &HashSet<Coordinate>,
-    ) -> Option<Coordinate>;
+        existing_tiles: &HashSet<Coordinate>,
+        max_height: i16,
+    ) -> Result<Coordinate, ErrorKind>;
+
+    fn movement(&self, kind: MoveKind) -> Coordinate;
 }
 
 impl Sand for Coordinate {
     fn spread(
-        &mut self,
-        existing_coordinates: &HashSet<Coordinate>,
+        &self,
+        existing_tiles: &HashSet<Coordinate>,
+        max_height: i16,
     ) -> Result<Coordinate, ErrorKind> {
-        let left_occupied = existing_coordinates.contains(&(self.0 - 1, self.1));
-        let right_occupied = existing_coordinates.contains(&(self.0 - 1, self.1));
+        let left_occupied = existing_tiles.contains(&(self.0 - 1, self.1 + 1));
+        let right_occupied = existing_tiles.contains(&(self.0 + 1, self.1 + 1));
+        let down_occupied = existing_tiles.contains(&(self.0, self.1 + 1));
 
-        let coord = match (left_occupied, right_occupied) {
-            (true, false) => self.get_floor_coordinate(current_y, existing_coordinates)
+        if self.1 == max_height {
+            return Err(ErrorKind::FallingForever);
+        }
+
+        if left_occupied && right_occupied && down_occupied {
+            if existing_tiles.contains(self) {
+                return Err(ErrorKind::NotSpace);
+            } else {
+                return Ok(*self);
+            }
+        }
+
+        let next_coordinate = if !down_occupied {
+            self.movement(MoveKind::Down)
+        } else if !left_occupied {
+            self.movement(MoveKind::LeftDown)
+        } else {
+            self.movement(MoveKind::RightDown)
+        };
+
+        next_coordinate.spread(existing_tiles, max_height)
+    }
+
+    fn movement(&self, kind: MoveKind) -> Coordinate {
+        match kind {
+            MoveKind::LeftDown => (self.0 - 1, self.1 + 1),
+            MoveKind::RightDown => (self.0 + 1, self.1 + 1),
+            MoveKind::Down => (self.0, self.1 + 1),
         }
     }
+}
 
-    fn get_floor_coordinate(
-        &self,
-        current_x: i16,
-        existing_coordinates: &HashSet<Coordinate>,
-    ) -> Option<Coordinate> {
-        existing_coordinates
-            .iter()
-            .filter(|(x, _)| *x == current_x)
-            .max()
-            .copied()
-    }
+enum MoveKind {
+    LeftDown,
+    RightDown,
+    Down,
 }
 
 enum ErrorKind {
     FallingForever,
     NotSpace,
-    BlockedSource,
-}
-
-enum FloorKind {
-    Infinite,
-    Solid,
 }
 
 impl FourteenthPuzzle {
@@ -143,11 +164,12 @@ impl FourteenthPuzzle {
         }
     }
 
-    fn sand_coming_to_the_rest(&self, kind: FloorKind) -> usize {
+    fn sand_coming_to_the_rest(&self) -> usize {
         let coordinates = self.scan_path();
-        let mut sand = Sand::new(coordinates, kind);
-        sand.populate_spreaded_sand();
-        sand.spreaded_sand.len()
+        let origin_len = coordinates.len();
+        let mut triangle = Tringle::new(coordinates);
+        triangle.spread_the_coordinates();
+        triangle.coordinates.len() - origin_len
     }
 
     fn scan_path(&self) -> HashSet<Coordinate> {
@@ -186,10 +208,11 @@ mod tests {
     fn sand_to_rest_till_source_is_blocked() {
         assert_eq!(
             93,
-            FourteenthPuzzle {
+            /*FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_coming_to_the_rest(FloorKind::Solid)
+            .sand_coming_to_the_rest(FloorKind::Solid)*/
+            3
         );
     }
 
@@ -200,7 +223,7 @@ mod tests {
             FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_coming_to_the_rest(FloorKind::Infinite)
+            .sand_coming_to_the_rest()
         );
     }
 
@@ -209,7 +232,8 @@ mod tests {
             name: String::from("Test"),
             input: String::from(
                 "498,4 -> 498,6 -> 496,6
-                503,4 -> 502,4 -> 502,9 -> 494,9",
+                503,4 -> 502,4 -> 502,9 -> 494,9
+                ",
             ),
         }
     }
