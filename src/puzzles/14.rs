@@ -13,8 +13,8 @@ impl Solution for FourteenthPuzzle {
     fn solution(&self) {
         print_solution(
             &self.puzzle.name,
-            self.sand_coming_to_the_rest(),
-            self.sand_to_rest_till_source_is_blocked(),
+            self.sand_coming_to_the_rest(FloorWidthKind::Determined),
+            self.sand_coming_to_the_rest(FloorWidthKind::Infinite),
         );
     }
 }
@@ -68,42 +68,22 @@ impl FillLine for Coordinate {
 struct Triangle {
     coordinates: HashSet<Coordinate>,
     height: i16,
+    floor_kind: FloorWidthKind,
 }
 
 impl Triangle {
-    fn new(coordinates: HashSet<Coordinate>) -> Self {
-        let height = *coordinates.iter().map(|(_, y)| y).max().unwrap();
+    fn new(coordinates: HashSet<Coordinate>, floor_kind: FloorWidthKind) -> Self {
+        let mut height = *coordinates.iter().map(|(_, y)| y).max().unwrap();
+
+        match floor_kind {
+            FloorWidthKind::Infinite => height += 2,
+            _ => {}
+        }
 
         Self {
             coordinates,
             height,
-        }
-    }
-
-    fn construct_isosceles(coordinates: HashSet<Coordinate>) -> Self {
-        let height = *coordinates.iter().map(|(_, y)| y).max().unwrap() + 1;
-        let mut spreaded_sand = HashSet::new();
-
-        for idx in 0..=height {
-            for second_idx in 0..=idx {
-                spreaded_sand.insert((500 - second_idx, idx));
-                spreaded_sand.insert((500 + second_idx, idx));
-            }
-        }
-
-        spreaded_sand = spreaded_sand
-            .into_iter()
-            .filter(|s| {
-                !coordinates.contains(s)
-                    && !(coordinates.contains(&(s.0, s.1 - 1))
-                        && coordinates.contains(&(s.0 - 1, s.1 - 1))
-                        && coordinates.contains(&(s.0 + 1, s.1 - 1)))
-            })
-            .collect();
-
-        Self {
-            height,
-            coordinates: spreaded_sand,
+            floor_kind,
         }
     }
 
@@ -112,13 +92,13 @@ impl Triangle {
         let mut starting_coordinate: Coordinate = (500, starting_height - 1);
 
         loop {
-            match starting_coordinate.spread(&self.coordinates, self.height) {
+            match starting_coordinate.spread(&self.coordinates, self.height, &self.floor_kind) {
                 Ok(c) => {
                     self.coordinates.insert(c);
                 }
                 Err(kind) => match kind {
                     ErrorKind::NotSpace => starting_coordinate.1 -= 1,
-                    ErrorKind::FallingForever => break,
+                    _ => break,
                 },
             }
         }
@@ -130,6 +110,7 @@ trait Sand {
         &self,
         existing_tiles: &HashSet<Coordinate>,
         max_height: i16,
+        floor_kind: &FloorWidthKind,
     ) -> Result<Coordinate, ErrorKind>;
 
     fn movement(&self, kind: MoveKind) -> Coordinate;
@@ -140,17 +121,26 @@ impl Sand for Coordinate {
         &self,
         existing_tiles: &HashSet<Coordinate>,
         max_height: i16,
+        floor_kind: &FloorWidthKind,
     ) -> Result<Coordinate, ErrorKind> {
         let left_occupied = existing_tiles.contains(&(self.0 - 1, self.1 + 1));
         let right_occupied = existing_tiles.contains(&(self.0 + 1, self.1 + 1));
         let down_occupied = existing_tiles.contains(&(self.0, self.1 + 1));
+        let self_contained = existing_tiles.contains(self);
 
-        if self.1 == max_height {
-            return Err(ErrorKind::FallingForever);
+        if self.1 >= max_height {
+            match floor_kind {
+                FloorWidthKind::Determined => return Err(ErrorKind::FallingForever),
+                FloorWidthKind::Infinite => return Err(ErrorKind::NotSpace),
+            }
+        }
+
+        if *self == (500, 0) && self_contained {
+            return Err(ErrorKind::SourceBlocked);
         }
 
         if left_occupied && right_occupied && down_occupied {
-            if existing_tiles.contains(self) {
+            if self_contained {
                 return Err(ErrorKind::NotSpace);
             } else {
                 return Ok(*self);
@@ -165,7 +155,7 @@ impl Sand for Coordinate {
             self.movement(MoveKind::RightDown)
         };
 
-        next_coordinate.spread(existing_tiles, max_height)
+        next_coordinate.spread(existing_tiles, max_height, floor_kind)
     }
 
     fn movement(&self, kind: MoveKind) -> Coordinate {
@@ -186,6 +176,12 @@ enum MoveKind {
 enum ErrorKind {
     FallingForever,
     NotSpace,
+    SourceBlocked,
+}
+
+enum FloorWidthKind {
+    Infinite,
+    Determined,
 }
 
 impl FourteenthPuzzle {
@@ -195,29 +191,10 @@ impl FourteenthPuzzle {
         }
     }
 
-    fn sand_to_rest_till_source_is_blocked(&self) -> usize {
-        let mut sum = 0;
-        let mut starting_num = 1;
-        let mut line = 171;
-
-        for _ in 0..=line {
-            sum += starting_num;
-            starting_num += 2;
-        }
-
-        println!("{sum}");
-
-
-
-        Triangle::construct_isosceles(self.scan_path())
-            .coordinates
-            .len()
-    }
-
-    fn sand_coming_to_the_rest(&self) -> usize {
+    fn sand_coming_to_the_rest(&self, floor_kind: FloorWidthKind) -> usize {
         let coordinates = self.scan_path();
         let origin_len = coordinates.len();
-        let mut triangle = Triangle::new(coordinates);
+        let mut triangle = Triangle::new(coordinates, floor_kind);
         triangle.spread_the_coordinates();
         triangle.coordinates.len() - origin_len
     }
@@ -261,7 +238,7 @@ mod tests {
             FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_to_rest_till_source_is_blocked()
+            .sand_coming_to_the_rest(FloorWidthKind::Infinite)
         );
     }
 
@@ -272,7 +249,7 @@ mod tests {
             FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_coming_to_the_rest()
+            .sand_coming_to_the_rest(FloorWidthKind::Determined)
         );
     }
 
