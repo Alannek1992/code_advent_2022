@@ -11,7 +11,11 @@ pub struct FourteenthPuzzle {
 
 impl Solution for FourteenthPuzzle {
     fn solution(&self) {
-        print_solution(&self.puzzle.name, self.sand_coming_to_the_rest(), 0);
+        print_solution(
+            &self.puzzle.name,
+            self.sand_coming_to_the_rest(),
+            self.sand_to_rest_till_source_is_blocked(),
+        );
     }
 }
 
@@ -61,18 +65,45 @@ impl FillLine for Coordinate {
     }
 }
 
-struct Tringle {
+struct Triangle {
     coordinates: HashSet<Coordinate>,
     height: i16,
 }
 
-impl Tringle {
+impl Triangle {
     fn new(coordinates: HashSet<Coordinate>) -> Self {
         let height = *coordinates.iter().map(|(_, y)| y).max().unwrap();
 
         Self {
             coordinates,
             height,
+        }
+    }
+
+    fn construct_isosceles(coordinates: HashSet<Coordinate>) -> Self {
+        let height = *coordinates.iter().map(|(_, y)| y).max().unwrap() + 1;
+        let mut spreaded_sand = HashSet::new();
+
+        for idx in 0..=height {
+            for second_idx in 0..=idx {
+                spreaded_sand.insert((500 - second_idx, idx));
+                spreaded_sand.insert((500 + second_idx, idx));
+            }
+        }
+
+        spreaded_sand = spreaded_sand
+            .into_iter()
+            .filter(|s| {
+                !coordinates.contains(s)
+                    && !(coordinates.contains(&(s.0, s.1 - 1))
+                        && coordinates.contains(&(s.0 - 1, s.1 - 1))
+                        && coordinates.contains(&(s.0 + 1, s.1 - 1)))
+            })
+            .collect();
+
+        Self {
+            height,
+            coordinates: spreaded_sand,
         }
     }
 
@@ -164,10 +195,29 @@ impl FourteenthPuzzle {
         }
     }
 
+    fn sand_to_rest_till_source_is_blocked(&self) -> usize {
+        let mut sum = 0;
+        let mut starting_num = 1;
+        let mut line = 171;
+
+        for _ in 0..=line {
+            sum += starting_num;
+            starting_num += 2;
+        }
+
+        println!("{sum}");
+
+
+
+        Triangle::construct_isosceles(self.scan_path())
+            .coordinates
+            .len()
+    }
+
     fn sand_coming_to_the_rest(&self) -> usize {
         let coordinates = self.scan_path();
         let origin_len = coordinates.len();
-        let mut triangle = Tringle::new(coordinates);
+        let mut triangle = Triangle::new(coordinates);
         triangle.spread_the_coordinates();
         triangle.coordinates.len() - origin_len
     }
@@ -208,11 +258,10 @@ mod tests {
     fn sand_to_rest_till_source_is_blocked() {
         assert_eq!(
             93,
-            /*FourteenthPuzzle {
+            FourteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
-            .sand_coming_to_the_rest(FloorKind::Solid)*/
-            3
+            .sand_to_rest_till_source_is_blocked()
         );
     }
 
