@@ -88,7 +88,13 @@ impl Triangle {
     }
 
     fn spread_the_coordinates(&mut self) {
-        let starting_height = *self.coordinates.iter().map(|(_, y)| y).min().unwrap();
+        let starting_height = *self
+            .coordinates
+            .iter()
+            .filter(|(x, _)| *x == 500)
+            .map(|(_, y)| y)
+            .min()
+            .unwrap();
         let mut starting_coordinate: Coordinate = (500, starting_height - 1);
 
         loop {
@@ -128,7 +134,7 @@ impl Sand for Coordinate {
         let down_occupied = existing_tiles.contains(&(self.0, self.1 + 1));
         let self_contained = existing_tiles.contains(self);
 
-        if self.1 >= max_height {
+        if self.1 > max_height {
             match floor_kind {
                 FloorWidthKind::Determined => return Err(ErrorKind::FallingForever),
                 FloorWidthKind::Infinite => return Err(ErrorKind::NotSpace),
@@ -137,6 +143,15 @@ impl Sand for Coordinate {
 
         if *self == (500, 0) && self_contained {
             return Err(ErrorKind::SourceBlocked);
+        }
+
+        match floor_kind {
+            FloorWidthKind::Infinite => {
+                if self.1 + 1 == max_height {
+                    return Ok(*self);
+                }
+            }
+            _ => {}
         }
 
         if left_occupied && right_occupied && down_occupied {
