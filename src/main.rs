@@ -5,7 +5,7 @@ use puzzles::{
     first_puzzle::FirstPuzzle, fourth_puzzle::FourthPuzzle, ninth_puzzle::NinthPuzzle,
     second_puzzle::SecondPuzzle, seventh_puzzle::SeventhPuzzle, sixth_puzzle::SixthPuzzle,
     tenth_puzzle::TenthPuzzle, third_puzzle::ThirdPuzzle, thirteenth_puzzle::ThirteenthPuzzle,
-    twelfth_puzzle::TwelfthPuzzle, fourteenth_puzzle::FourteenthPuzzle,
+    twelfth_puzzle::TwelfthPuzzle, fourteenth_puzzle::FourteenthPuzzle, fifteenth_puzzle::FifteenthPuzzle,
 };
 
 mod puzzles;
@@ -44,6 +44,7 @@ fn main() {
         Box::new(TwelfthPuzzle::new()),
         Box::new(ThirteenthPuzzle::new()),
         Box::new(FourteenthPuzzle::new()),
+        Box::new(FifteenthPuzzle::new()),
     ];
 
     puzzles.iter().for_each(|puzzle| puzzle.solution());

@@ -26,3 +26,5 @@ pub mod twelfth_puzzle;
 pub mod thirteenth_puzzle;
 #[path ="puzzles/14.rs"]
 pub mod fourteenth_puzzle;
+#[path ="puzzles/15.rs"]
+pub mod fifteenth_puzzle;
