@@ -82,6 +82,7 @@ impl Area {
             }
         });
 
+// should filter out the sensors!
         loop {
             let test: Vec<(i32, i32)> = self
                 .extend_to_y(starting_y)
