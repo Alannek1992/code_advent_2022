@@ -1,4 +1,5 @@
-use itertools::Itertools;
+use std::collections::HashSet;
+
 use regex::Regex;
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
@@ -11,44 +12,104 @@ impl Solution for FifteenthPuzzle {
     fn solution(&self) {
         print_solution(
             &self.puzzle.name,
-            self.positions_not_containing_beacon(2000000),
+            self.read_sensors().positions_not_containing_beacon(2000000),
             0,
         );
     }
 }
 
 type Coordinate = (i32, i32);
+type Line = (X, X);
+type X = i32;
+type Y = i32;
 
-#[derive(Debug)]
-struct Line {
-    starting_coordinate: Coordinate,
-    ending_coordinate: Coordinate,
-    coordinates_coverage: i32,
+struct Area {
+    sensors: Vec<Coordinate>,
+    beacons: Vec<Coordinate>,
 }
 
-impl Line {
-    fn new(starting_coordinate: Coordinate, ending_coordinate: Coordinate) -> Self {
+impl Area {
+    fn new() -> Self {
         Self {
-            starting_coordinate,
-            ending_coordinate,
-            coordinates_coverage: Self::calc_coordinate_coverage(
-                starting_coordinate,
-                ending_coordinate,
-            ),
+            sensors: Vec::new(),
+            beacons: Vec::new(),
         }
     }
 
-    fn calc_coordinate_coverage(
-        starting_coordinate: Coordinate,
-        ending_coordinate: Coordinate,
-    ) -> i32 {
+    fn calc_coverage(starting_coordinate: Coordinate, ending_coordinate: Coordinate) -> i32 {
         (starting_coordinate.0 - ending_coordinate.0).abs()
             + (starting_coordinate.1 - ending_coordinate.1).abs()
     }
 
-    fn is_in_coordinates_coverage(&self, coordinate: Coordinate) -> bool {
-        Self::calc_coordinate_coverage(self.starting_coordinate, coordinate)
-            <= self.coordinates_coverage
+    fn add_sensor_and_beacon(&mut self, sensor: Coordinate, beacon: Coordinate) {
+        self.sensors.push(sensor);
+        self.beacons.push(beacon);
+    }
+
+    fn extend_to_y(&self, y: Y) -> HashSet<Line> {
+        let mut coordinates = HashSet::new();
+        self.sensors
+            .iter()
+            .zip(self.beacons.iter())
+            .for_each(|(sensor, beacon)| {
+                let coverage = Self::calc_coverage(*sensor, *beacon);
+                let coverage = coverage - (sensor.1 - y).abs();
+
+                if coverage > 0 {
+                    coordinates.insert((sensor.0 - coverage, sensor.0 + coverage));
+                }
+            });
+        coordinates
+    }
+
+    fn tuning_frequency(&self) -> i32 {
+        let mut starting_y = 0;
+        let mut starting_x = 0;
+        let mut ending_x = 0;
+        self.sensors.iter().for_each(|s| {
+            if s.1 >= 0 && s.1 < starting_y {
+                starting_y = s.1
+            }
+
+            if s.0 >= 0 && s.0 <= 4000000 {
+                if s.0 < starting_x {
+                    starting_x = s.0;
+                }
+
+                if s.0 > ending_x {
+                    ending_x = s.0
+                }
+            }
+        });
+
+        loop {
+            let test: Vec<(i32, i32)> = self
+                .extend_to_y(starting_y)
+                .into_iter()
+                .filter(|l| l.0 >= starting_x && l.0 <= ending_x)
+                .collect();
+            println!("{:?}", test);
+
+            break;
+        }
+
+        10
+    }
+
+    fn positions_not_containing_beacon(&self, y: Y) -> i32 {
+        let mut min = 0;
+        let mut max = 0;
+        self.extend_to_y(y).iter().for_each(|(start, end)| {
+            if *start < min {
+                min = *start;
+            }
+
+            if *end > max {
+                max = *end;
+            }
+        });
+
+        (min..max).len() as i32
     }
 }
 
@@ -62,42 +123,18 @@ impl FifteenthPuzzle {
         }
     }
 
-    fn positions_not_containing_beacon(&self, y: i32) -> u32 {
-        let sensors_and_beacons = self.read_sensors();
-        let x_coordinates_of_beacons: Vec<i32> = sensors_and_beacons
-            .iter()
-            .map(|line| line.ending_coordinate.0)
-            .sorted()
-            .collect();
-        let mut positions_not_containing_beacon = 0;
-
-        for x in *x_coordinates_of_beacons.first().unwrap() + 1
-            ..*x_coordinates_of_beacons.last().unwrap()
-        {
-            for line in sensors_and_beacons.iter() {
-                if line.is_in_coordinates_coverage((x, y)) {
-                    positions_not_containing_beacon += 1;
-                    break;
-                }
-            }
-        }
-
-        positions_not_containing_beacon
-    }
-
-    fn read_sensors(&self) -> Vec<Line> {
+    fn read_sensors(&self) -> Area {
         let re_coordinates = Regex::new(r".*x=(-?\d+), y=(-?\d+).*x=(-?\d+), y=(-?\d+)").unwrap();
-        self.puzzle
-            .input
-            .lines()
-            .map(|line| {
-                let captures = re_coordinates.captures(line.trim()).unwrap();
-                Line::new(
-                    (captures[1].parse().unwrap(), captures[2].parse().unwrap()),
-                    (captures[3].parse().unwrap(), captures[4].parse().unwrap()),
-                )
-            })
-            .collect()
+        let mut area = Area::new();
+        self.puzzle.input.lines().for_each(|line| {
+            let captures = re_coordinates.captures(line.trim()).unwrap();
+            area.add_sensor_and_beacon(
+                (captures[1].parse().unwrap(), captures[2].parse().unwrap()),
+                (captures[3].parse().unwrap(), captures[4].parse().unwrap()),
+            );
+        });
+
+        area
     }
 }
 
@@ -108,12 +145,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn tuning_frequency() {
+        assert_eq!(
+            56000011,
+            FifteenthPuzzle {
+                puzzle: get_puzzle_info(),
+            }
+            .read_sensors()
+            .tuning_frequency()
+        );
+    }
+
+    #[test]
     fn positions_not_containing_beacon() {
         assert_eq!(
             26,
             FifteenthPuzzle {
                 puzzle: get_puzzle_info(),
             }
+            .read_sensors()
             .positions_not_containing_beacon(10)
         );
     }
