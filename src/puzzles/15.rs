@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use itertools::Itertools;
 use regex::Regex;
 
 use crate::{util::print_solution, PuzzleInfo, Solution};
@@ -13,104 +14,91 @@ impl Solution for FifteenthPuzzle {
         print_solution(
             &self.puzzle.name,
             self.read_sensors().positions_not_containing_beacon(2000000),
-            0,
+            self.read_sensors().tuning_frequency(),
         );
     }
 }
 
-type Coordinate = (i32, i32);
-type Line = (X, X);
+type Line = (Coordinate, Coordinate);
+type Coordinate = (X, Y);
 type X = i32;
 type Y = i32;
+
+struct Rhombus {
+    center: Coordinate,
+    coverage: i32,
+}
+
+impl Rhombus {
+    fn new(sensor: Coordinate, beacon: Coordinate) -> Self {
+        let coverage = (sensor.0 - beacon.0).abs() + (sensor.1 - beacon.1).abs();
+
+        Self {
+            center: sensor,
+            coverage,
+        }
+    }
+
+    fn get_lines(&self) -> Vec<Line> {
+        let left = (self.center.0 - self.coverage, self.center.1);
+        let down = (self.center.0, self.center.1 + self.coverage);
+        let right = (self.center.0 + self.coverage, self.center.1);
+        let up = (self.center.0, self.center.1 - self.coverage);
+        vec![(left, down), (down, right), (right, up), (up, left)]
+    }
+
+    fn get_x_coordinates_for_line(&self, y: Y) -> Option<Line> {
+        let diff = (self.center.1 - y).abs();
+        let coverage = self.coverage - diff;
+
+        if coverage < 0 {
+            return None;
+        };
+
+        Some(((self.center.0 - coverage, y), (self.center.0 + coverage, y)))
+    }
+}
 
 struct Area {
     sensors: Vec<Coordinate>,
     beacons: Vec<Coordinate>,
+    rhombuses: Vec<Rhombus>,
 }
 
 impl Area {
     fn new() -> Self {
         Self {
-            sensors: Vec::new(),
-            beacons: Vec::new(),
+            sensors: vec![],
+            beacons: vec![],
+            rhombuses: vec![],
         }
-    }
-
-    fn calc_coverage(starting_coordinate: Coordinate, ending_coordinate: Coordinate) -> i32 {
-        (starting_coordinate.0 - ending_coordinate.0).abs()
-            + (starting_coordinate.1 - ending_coordinate.1).abs()
     }
 
     fn add_sensor_and_beacon(&mut self, sensor: Coordinate, beacon: Coordinate) {
         self.sensors.push(sensor);
         self.beacons.push(beacon);
-    }
-
-    fn extend_to_y(&self, y: Y) -> HashSet<Line> {
-        let mut coordinates = HashSet::new();
-        self.sensors
-            .iter()
-            .zip(self.beacons.iter())
-            .for_each(|(sensor, beacon)| {
-                let coverage = Self::calc_coverage(*sensor, *beacon);
-                let coverage = coverage - (sensor.1 - y).abs();
-
-                if coverage > 0 {
-                    coordinates.insert((sensor.0 - coverage, sensor.0 + coverage));
-                }
-            });
-        coordinates
+        self.rhombuses.push(Rhombus::new(sensor, beacon))
     }
 
     fn tuning_frequency(&self) -> i32 {
-        let mut starting_y = 0;
-        let mut starting_x = 0;
-        let mut ending_x = 0;
-        self.sensors.iter().for_each(|s| {
-            if s.1 >= 0 && s.1 < starting_y {
-                starting_y = s.1
-            }
-
-            if s.0 >= 0 && s.0 <= 4000000 {
-                if s.0 < starting_x {
-                    starting_x = s.0;
-                }
-
-                if s.0 > ending_x {
-                    ending_x = s.0
-                }
-            }
-        });
-
-// should filter out the sensors!
-        loop {
-            let test: Vec<(i32, i32)> = self
-                .extend_to_y(starting_y)
-                .into_iter()
-                .filter(|l| l.0 >= starting_x && l.0 <= ending_x)
-                .collect();
-            println!("{:?}", test);
-
-            break;
-        }
-
+        let test: Vec<Line> = self.rhombuses.iter().flat_map(|r| r.get_lines()).collect();
+        println!("hohohou");
         10
     }
 
     fn positions_not_containing_beacon(&self, y: Y) -> i32 {
-        let mut min = 0;
-        let mut max = 0;
-        self.extend_to_y(y).iter().for_each(|(start, end)| {
-            if *start < min {
-                min = *start;
-            }
+        let x_coordinates: Vec<i32> = self
+            .rhombuses
+            .iter()
+            .flat_map(|r| match r.get_x_coordinates_for_line(y) {
+                Some(line) => vec![line.0 .0, line.1 .0],
+                None => vec![],
+            })
+            .sorted()
+            .collect();
 
-            if *end > max {
-                max = *end;
-            }
-        });
-
-        (min..max).len() as i32
+        (*x_coordinates.get(0).unwrap()..*x_coordinates.get(x_coordinates.len() - 1).unwrap()).len()
+            as i32
     }
 }
 
