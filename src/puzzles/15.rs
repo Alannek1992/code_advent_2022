@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet};
 
 use itertools::Itertools;
 use regex::Regex;
@@ -40,12 +40,46 @@ impl Rhombus {
     }
 
     fn get_lines(&self) -> Vec<Line> {
-        let left = (self.center.0 - self.coverage, self.center.1);
-        let down = (self.center.0, self.center.1 + self.coverage);
-        let right = (self.center.0 + self.coverage, self.center.1);
-        let up = (self.center.0, self.center.1 - self.coverage);
-        vec![(left, down), (down, right), (right, up), (up, left)]
+        let mut lines = vec![];
+
+        lines.push((
+            (self.center.0 - self.coverage, self.center.1),
+            (self.center.0 + self.coverage, self.center.1),
+        ));
+        let mut counter = 1;
+
+        // implement the restrictions
+
+        while counter < self.coverage {
+            lines.push((
+                (
+                    self.center.0 - self.coverage + counter,
+                    self.center.1 + counter,
+                ),
+                (
+                    self.center.0 + self.coverage - counter,
+                    self.center.1 + counter,
+                ),
+            ));
+
+            lines.push((
+                (
+                    self.center.0 - self.coverage + counter,
+                    self.center.1 - counter,
+                ),
+                (
+                    self.center.0 + self.coverage - counter,
+                    self.center.1 - counter,
+                ),
+            ));
+
+            counter += 1;
+        }
+
+        lines
     }
+
+
 
     fn get_x_coordinates_for_line(&self, y: Y) -> Option<Line> {
         let diff = (self.center.1 - y).abs();
@@ -82,7 +116,7 @@ impl Area {
 
     fn tuning_frequency(&self) -> i32 {
         let test: Vec<Line> = self.rhombuses.iter().flat_map(|r| r.get_lines()).collect();
-        println!("hohohou");
+        println!("hoph");
         10
     }
 
