@@ -1,4 +1,4 @@
-use std::{collections::HashSet};
+use std::ops::Neg;
 
 use itertools::Itertools;
 use regex::Regex;
@@ -39,47 +39,39 @@ impl Rhombus {
         }
     }
 
-    fn get_lines(&self) -> Vec<Line> {
+    fn get_lines(&self, x_restriction: Coordinate, y_restriction: Coordinate) -> Vec<Line> {
         let mut lines = vec![];
+        let mut counter_x = self.coverage.neg();
+        let mut counter_y = self.coverage.neg();
 
-        lines.push((
-            (self.center.0 - self.coverage, self.center.1),
-            (self.center.0 + self.coverage, self.center.1),
-        ));
-        let mut counter = 1;
+        if (counter_x < x_restriction.0 && self.coverage < x_restriction.0)
+            || (counter_y < y_restriction.0 && self.coverage < y_restriction.0)
+        {
+            return lines;
+        }
 
-        // implement the restrictions
+        if counter_x < x_restriction.0 {
+            counter_x = x_restriction.0
+        }
 
-        while counter < self.coverage {
+        if counter_y < y_restriction.0 {
+            counter_y = y_restriction.0
+        }
+
+
+        // the boundaries are inccoretcly set
+
+        while counter_x != x_restriction.1 || counter_y != y_restriction.1 {
             lines.push((
-                (
-                    self.center.0 - self.coverage + counter,
-                    self.center.1 + counter,
-                ),
-                (
-                    self.center.0 + self.coverage - counter,
-                    self.center.1 + counter,
-                ),
+                (self.center.0 + counter_x, self.center.1 + counter_y),
+                (self.center.0 - counter_x, self.center.1 + counter_y),
             ));
-
-            lines.push((
-                (
-                    self.center.0 - self.coverage + counter,
-                    self.center.1 - counter,
-                ),
-                (
-                    self.center.0 + self.coverage - counter,
-                    self.center.1 - counter,
-                ),
-            ));
-
-            counter += 1;
+            counter_x += 1;
+            counter_y += 1;
         }
 
         lines
     }
-
-
 
     fn get_x_coordinates_for_line(&self, y: Y) -> Option<Line> {
         let diff = (self.center.1 - y).abs();
@@ -115,7 +107,12 @@ impl Area {
     }
 
     fn tuning_frequency(&self) -> i32 {
-        let test: Vec<Line> = self.rhombuses.iter().flat_map(|r| r.get_lines()).collect();
+        let (x_restriction, y_restriction) = self.get_restricted_area();
+        let test: Vec<Line> = self
+            .rhombuses
+            .iter()
+            .flat_map(|r| r.get_lines(x_restriction, y_restriction))
+            .collect();
         println!("hoph");
         10
     }
@@ -133,6 +130,28 @@ impl Area {
 
         (*x_coordinates.get(0).unwrap()..*x_coordinates.get(x_coordinates.len() - 1).unwrap()).len()
             as i32
+    }
+
+    fn get_restricted_area(&self) -> (Coordinate, Coordinate) {
+        let (mut starting_x, mut ending_x) = (i32::MAX, i32::MIN);
+        let (mut starting_y, mut ending_y) = (i32::MAX, i32::MIN);
+
+        for sensor in self.sensors.iter() {
+            if sensor.0 >= 0 && sensor.0 < starting_x {
+                starting_x = sensor.0
+            }
+            if sensor.0 <= 4000000 && sensor.0 > ending_x {
+                ending_x = sensor.0
+            }
+            if sensor.1 >= 0 && sensor.1 < starting_y {
+                starting_y = sensor.1
+            }
+            if sensor.1 <= 4000000 && sensor.1 > ending_y {
+                ending_y = sensor.1
+            }
+        }
+
+        ((starting_x, ending_x), (starting_y, ending_y))
     }
 }
 
