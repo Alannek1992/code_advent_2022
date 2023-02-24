@@ -1,5 +1,3 @@
-use std::ops::Neg;
-
 use itertools::Itertools;
 use regex::Regex;
 
@@ -19,8 +17,28 @@ impl Solution for FifteenthPuzzle {
     }
 }
 
-type Line = (Coordinate, Coordinate);
 type Coordinate = (X, Y);
+
+trait CoordinateMerging {
+    fn merge(&mut self, next_coordinate: Coordinate) -> Result<(), ()>;
+}
+
+impl CoordinateMerging for Coordinate {
+    fn merge(&mut self, next_coordinate: Self) -> Result<(), ()> {
+        if next_coordinate.0 - 1 <= self.1 {
+            if self.0 > next_coordinate.0 {
+                self.0 = next_coordinate.0;
+            }
+            if self.1 < next_coordinate.1 {
+                self.1 = next_coordinate.1;
+            }
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 type X = i32;
 type Y = i32;
 
@@ -31,49 +49,46 @@ struct Rhombus {
 
 impl Rhombus {
     fn new(sensor: Coordinate, beacon: Coordinate) -> Self {
-        let coverage = (sensor.0 - beacon.0).abs() + (sensor.1 - beacon.1).abs();
-
         Self {
             center: sensor,
-            coverage,
+            coverage: Self::calculate_coverage(sensor, beacon),
         }
     }
 
-    fn get_lines(&self, x_restriction: Coordinate, y_restriction: Coordinate) -> Vec<Line> {
-        let mut lines = vec![];
-        let mut counter_x = self.coverage.neg();
-        let mut counter_y = self.coverage.neg();
-
-        if (counter_x < x_restriction.0 && self.coverage < x_restriction.0)
-            || (counter_y < y_restriction.0 && self.coverage < y_restriction.0)
-        {
-            return lines;
-        }
-
-        if counter_x < x_restriction.0 {
-            counter_x = x_restriction.0
-        }
-
-        if counter_y < y_restriction.0 {
-            counter_y = y_restriction.0
-        }
-
-
-        // the boundaries are inccoretcly set
-
-        while counter_x != x_restriction.1 || counter_y != y_restriction.1 {
-            lines.push((
-                (self.center.0 + counter_x, self.center.1 + counter_y),
-                (self.center.0 - counter_x, self.center.1 + counter_y),
-            ));
-            counter_x += 1;
-            counter_y += 1;
-        }
-
-        lines
+    fn calculate_coverage(first_coordinate: Coordinate, second_coordinate: Coordinate) -> i32 {
+        (first_coordinate.0 - second_coordinate.0).abs()
+            + (first_coordinate.1 - second_coordinate.1).abs()
     }
 
-    fn get_x_coordinates_for_line(&self, y: Y) -> Option<Line> {
+    fn calculate_boundary_with_restriction(
+        &self,
+        value: i32,
+        restriction_value: i32,
+        restriction_kind: RestrictionKind,
+    ) -> i32 {
+        match restriction_kind {
+            RestrictionKind::GreaterEq => {
+                if value < restriction_value {
+                    restriction_value
+                } else {
+                    value
+                }
+            }
+            RestrictionKind::LessEq => {
+                if value > restriction_value {
+                    restriction_value
+                } else {
+                    value
+                }
+            }
+        }
+    }
+
+    fn get_x_coordinates_for_y(
+        &self,
+        y: Y,
+        x_restriction: Option<Coordinate>,
+    ) -> Option<Coordinate> {
         let diff = (self.center.1 - y).abs();
         let coverage = self.coverage - diff;
 
@@ -81,8 +96,27 @@ impl Rhombus {
             return None;
         };
 
-        Some(((self.center.0 - coverage, y), (self.center.0 + coverage, y)))
+        match x_restriction {
+            Some(restriction) => Some((
+                self.calculate_boundary_with_restriction(
+                    self.center.0 - coverage,
+                    restriction.0,
+                    RestrictionKind::GreaterEq,
+                ),
+                self.calculate_boundary_with_restriction(
+                    self.center.0 + coverage,
+                    restriction.1,
+                    RestrictionKind::LessEq,
+                ),
+            )),
+            None => Some((self.center.0 - coverage, self.center.0 + coverage)),
+        }
     }
+}
+
+enum RestrictionKind {
+    GreaterEq,
+    LessEq,
 }
 
 struct Area {
@@ -106,30 +140,42 @@ impl Area {
         self.rhombuses.push(Rhombus::new(sensor, beacon))
     }
 
-    fn tuning_frequency(&self) -> i32 {
+    fn tuning_frequency(&self) -> i64 {
         let (x_restriction, y_restriction) = self.get_restricted_area();
-        let test: Vec<Line> = self
-            .rhombuses
-            .iter()
-            .flat_map(|r| r.get_lines(x_restriction, y_restriction))
-            .collect();
-        println!("hoph");
-        10
+
+        for line_no in y_restriction.0..=y_restriction.1 {
+            let mut lines: Vec<Coordinate> = vec![];
+            for rhombus in self.rhombuses.iter() {
+                match rhombus.get_x_coordinates_for_y(line_no, Some(x_restriction)) {
+                    Some(line) => lines.push(line),
+                    None => continue,
+                }
+            }
+            lines.sort_by(|a, b| a.0.cmp(&b.0));
+            let mut coord = *lines.get(0).unwrap();
+            for l in lines {
+                match coord.merge(l) {
+                    Ok(()) => {}
+                    Err(()) => return (l.0 - 1) as i64 * 4000000 + line_no as i64
+                }
+            }
+        }
+        unreachable!()
     }
 
-    fn positions_not_containing_beacon(&self, y: Y) -> i32 {
+    fn positions_not_containing_beacon(&self, y: Y) -> i64 {
         let x_coordinates: Vec<i32> = self
             .rhombuses
             .iter()
-            .flat_map(|r| match r.get_x_coordinates_for_line(y) {
-                Some(line) => vec![line.0 .0, line.1 .0],
+            .flat_map(|r| match r.get_x_coordinates_for_y(y, None) {
+                Some(line) => vec![line.0, line.1],
                 None => vec![],
             })
             .sorted()
             .collect();
 
         (*x_coordinates.get(0).unwrap()..*x_coordinates.get(x_coordinates.len() - 1).unwrap()).len()
-            as i32
+            as i64
     }
 
     fn get_restricted_area(&self) -> (Coordinate, Coordinate) {
