@@ -156,7 +156,7 @@ impl Area {
             for l in lines {
                 match coord.merge(l) {
                     Ok(()) => {}
-                    Err(()) => return (l.0 - 1) as i64 * 4000000 + line_no as i64
+                    Err(()) => return (l.0 - 1) as i64 * 4000000 + line_no as i64,
                 }
             }
         }
